@@ -3,10 +3,7 @@ import requests
 from Mempool.mempool import Mempool
 
 # Replace with your Raspberry Pi's actual local IP
-RASPBERRY_PI_IP = "192.168.178.168"  # Update this
-RPC_USER = "raspibolt"  # Use the same username from bitcoin.conf
-RPC_PASSWORD = "98k0hhshfjfc1gm"  # Use the same password from bitcoin.conf
-RPC_PORT = "8332"
+
 
 # Connect to Bitcoin Core
 #rpc_url = f"http://{RPC_USER}:{RPC_PASSWORD}@{RASPBERRY_PI_IP}:{RPC_PORT}"
@@ -30,5 +27,11 @@ RPC_PORT = "8332"
 mempool = Mempool()
 
 # Fetch mempool data
-mempool_data = mempool.get_mempool()
-print(mempool_data)
+fee_rates = mempool.get_mempool_feerates()
+fast_fee = fee_rates[int(len(fee_rates) * 0.25)] if len(fee_rates) > 10 else max(fee_rates)
+medium_fee = fee_rates[int(len(fee_rates) * 0.5)] if len(fee_rates) > 2 else fee_rates[0]  # Median
+low_fee = fee_rates[-1]  # Lowest
+
+print(f"🚀 Fast Fee: {fast_fee:.2f} sat/vB")
+print(f"⏳ Medium Fee: {medium_fee:.2f} sat/vB")
+print(f"💤 Low Fee: {low_fee:.2f} sat/vB")
