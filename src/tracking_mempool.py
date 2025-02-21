@@ -1,10 +1,8 @@
-import os
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from node_data import ELECTRUM_HOST
 import sqlite3
 import time
 import requests
+from Mempool.mempool import Mempool
+from Chain.chain import Chain
 
 
 # SQLite database connection
@@ -29,21 +27,17 @@ def create_table():
 def fetch_mempool_data():
     """Fetches mempool fee rates and transaction data."""
     try:
-        url = f"http://{ELECTRUM_HOST}:50001"  # Change to your Electrum server
-        # Fetching fee estimates (modify this to match your actual API call)
-        fees = requests.get("https://mempool.space/api/v1/fees/recommended").json()
-        fast_fee = fees["fastestFee"]
-        medium_fee = fees["halfHourFee"]
-        low_fee = fees["hourFee"]
+        mempool = Mempool()
+        chain = Chain()
+        fee_rates = mempool.get_mempool_feerates()
+        fast_fee = fee_rates[int(len(fee_rates) * 0.25)] if len(fee_rates) > 10 else max(fee_rates)
+        medium_fee = fee_rates[int(len(fee_rates) * 0.5)] if len(fee_rates) > 2 else fee_rates[0]  # Median
+        low_fee = fee_rates[-1]
         
-        # Fetching mempool stats
-        mempool = requests.get("https://mempool.space/api/mempool").json()
-        mempool_size = mempool["bytes"]
-        tx_count = mempool["count"]
+        mempool_size, tx_count = mempool.get_mempool_stats()
         
-        # Fetching latest block info
-        latest_block = requests.get("https://mempool.space/api/blocks/tip/height").json()
-        block_time = latest_block  # You may need to process this differently
+        latest_block = chain.get_block_height()
+        block_time = latest_block
         
         return fast_fee, medium_fee, low_fee, mempool_size, tx_count, block_time
     except Exception as e:

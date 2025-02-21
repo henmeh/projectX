@@ -26,21 +26,44 @@ class Mempool():
                 response = sock.recv(4096).decode()
                 fee_rates = []
                 for fee_rate, vsize in json.loads(response)["result"]:
-                    print(f"Fee rate: {fee_rate} sat/vB, Vsize: {vsize} vB")
                     if 1 < fee_rate < 50:
                         weight = int(math.sqrt(vsize))
                         fee_rates.extend([fee_rate] * weight)
-                        #fee_rates.extend([fee_rate] * int(math.log(vsize + 1)))
-                        #fee_rates.append(fee_rate * min(vsize, 0.1))
                 fee_rates.sort(reverse=True)
-                return fee_rates
-            
+                return fee_rates            
         except Exception as e:
             return f"Error: {str(e)}"
     
 
+    def get_mempool_stats(self) -> tuple:
+        """Fetches the mempool size and transaction count from Electrum server."""
+        try:
+            result = self.electrum_request("mempool.get_fee_histogram")
+            if "result" in result:
+                fee_histogram = result["result"]
+                total_mempool_size = sum([fee[1] for fee in fee_histogram])
+                total_tx_count = len(fee_histogram)
+                
+                return total_mempool_size, total_tx_count
+            else:
+                print("Error: No result in response")
+                return None
+        except Exception as e:
+            print(f"Error fetching mempool stats: {e}")
+            return None
+    
+
+    def electrum_request(self, method: str, params=[])-> json:
+        """Sends a JSON-RPC request to the Electrum server."""
+        request_data = json.dumps({"id": 0, "method": method, "params": params}) + "\n"
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.electrum_host, self.electrum_port))
+            s.sendall(request_data.encode("utf-8"))
+            response = s.recv(8192).decode("utf-8")
+        return json.loads(response)
+
+    """
     def get_mempool_for_address(self, address: str) -> json:
-        """Fetching Mempool data for a specific address"""
         scripthash = address_to_scripthash(address)
         
         request_data = {
@@ -60,7 +83,6 @@ class Mempool():
     
 
     def get_mempool_fees(self) -> list:
-        """Fetching fee rates from Bitcoin Core mempool"""
         headers = {"Content-Type": "application/json"}
         payload = json.dumps({"jsonrpc": "2.0", "id": 0, "method": "getrawmempool", "params": [True]})
 
@@ -76,3 +98,4 @@ class Mempool():
             fee_rates.append(fee_rate)
 
         return fee_rates
+    """
