@@ -1,5 +1,6 @@
 import socket
 import pandas as pd
+from bitcoinrpc.authproxy import AuthServiceProxy
 import requests
 import math
 import json
@@ -12,6 +13,9 @@ class Mempool():
     def __init__(self):
         self.electrum_host = ELECTRUM_HOST
         self.electrum_port = ELECTRUM_PORT
+        self.rpc_user = RPC_USER
+        self.rpc_password = RPC_PASSWORD
+        self.rpc_host = RPC_HOST
 
 
     def get_mempool_feerates(self) -> json:
@@ -68,8 +72,15 @@ class Mempool():
     def rpc_call(self, method: str, params=[]) -> json:
         """Helper function to call Bitcoin Core RPC"""
         payload = {"jsonrpc": "1.0", "id": method, "method": method, "params": params}
-        response = requests.post(f"http://{RPC_USER}:{RPC_PASSWORD}@{RPC_HOST}/", json=payload)
+        response = requests.post(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}/", json=payload)
         return response.json()
+    
+
+    def rpc_batch_call(self, method: str, params: list) -> json:
+        """Helper function to call Bitcoin Core RPC with batch requests"""
+        rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}")
+        batch = [{ "method": method, "params": params, "id": i } for i, params in enumerate(params)]
+        return rpc.batch_(batch)
     
 
     def get_mempool_txids(self)-> list:
