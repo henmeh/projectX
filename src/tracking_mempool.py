@@ -3,26 +3,27 @@ import time
 import requests
 from Mempool.mempool import Mempool
 from Chain.chain import Chain
+from Helper.helperfunctions import create_table
 
 
 # SQLite database connection
 DB_PATH = "/media/henning/Volume/Programming/projectX/src/mempol_data.db"
 
-def create_table():
-    """Creates the SQLite table if it doesn't exist."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS mempool_data (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        fast_fee REAL,
-                        medium_fee REAL,
-                        low_fee REAL,
-                        mempool_size INTEGER,
-                        tx_count INTEGER,
-                        block_time INTEGER)''')
-    conn.commit()
-    conn.close()
+#def create_table():
+#    """Creates the SQLite table if it doesn't exist."""
+#    conn = sqlite3.connect(DB_PATH)
+#    cursor = conn.cursor()
+#    cursor.execute('''CREATE TABLE IF NOT EXISTS mempool_data (
+#                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+#                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+#                        fast_fee REAL,
+#                        medium_fee REAL,
+#                        low_fee REAL,
+#                        mempool_size INTEGER,
+#                        tx_count INTEGER,
+#                        block_time INTEGER)''')
+#    conn.commit()
+#    conn.close()
 
 def fetch_mempool_data():
     """Fetches mempool fee rates and transaction data."""
@@ -58,7 +59,15 @@ def store_data():
         print(f"✅ Data stored at {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
 if __name__ == "__main__":
-    create_table()
+    create_table(DB_PATH, '''CREATE TABLE IF NOT EXISTS mempool_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        fast_fee REAL,
+                        medium_fee REAL,
+                        low_fee REAL,
+                        mempool_size INTEGER,
+                        tx_count INTEGER,
+                        block_time INTEGER)''')
     while True:
         store_data()
         time.sleep(60)  # Run every 60 seconds

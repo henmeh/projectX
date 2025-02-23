@@ -1,5 +1,6 @@
 import requests
 from Mempool.mempool import Mempool
+import json
 
 # Replace with your Raspberry Pi's actual local IP
 
@@ -32,6 +33,9 @@ mempool = Mempool()
 #print(f"⏳ Medium Fee: {medium_fee:.2f} sat/vB")
 #print(f"💤 Low Fee: {low_fee:.2f} sat/vB")
 
-mempool_size, tx_count = mempool.get_mempool_stats()
-print(mempool_size)
-print(tx_count)
+#mempool_size, tx_count = mempool.get_mempool_stats()
+#print(mempool_size)
+#print(tx_count)
+
+test = mempool.get_whale_transactions()
+print(test)

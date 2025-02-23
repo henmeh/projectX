@@ -1,8 +1,10 @@
 import socket
+import pandas as pd
+import requests
 import math
 import json
-from Helper.helperfunctions import address_to_scripthash
-from node_data import ELECTRUM_HOST, ELECTRUM_PORT
+from Helper.helperfunctions import create_table, store_data
+from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
 
 
 class Mempool():
@@ -61,41 +63,35 @@ class Mempool():
             s.sendall(request_data.encode("utf-8"))
             response = s.recv(8192).decode("utf-8")
         return json.loads(response)
-
-    """
-    def get_mempool_for_address(self, address: str) -> json:
-        scripthash = address_to_scripthash(address)
-        
-        request_data = {
-            "id": 0,
-            "method": "blockchain.scripthash.get_mempool",
-            "params": [scripthash]
-        }
-
-        try:
-            with socket.create_connection((self.electrum_host, self.electrum_port)) as sock:
-                sock.sendall(json.dumps(request_data).encode() + b'\n')
-                response = sock.recv(4096).decode()
-                return json.loads(response)
-        
-        except Exception as e:
-            return f"Error: {str(e)}"
     
 
-    def get_mempool_fees(self) -> list:
-        headers = {"Content-Type": "application/json"}
-        payload = json.dumps({"jsonrpc": "2.0", "id": 0, "method": "getrawmempool", "params": [True]})
+    def rpc_call(self, method: str, params=[]) -> json:
+        """Helper function to call Bitcoin Core RPC"""
+        payload = {"jsonrpc": "1.0", "id": method, "method": method, "params": params}
+        response = requests.post(f"http://{RPC_USER}:{RPC_PASSWORD}@{RPC_HOST}/", json=payload)
+        return response.json()
+    
 
-        response = requests.post(self.electrum_host, auth=(BITCOIN_RPC_USER, BITCOIN_RPC_PASSWORD), headers=headers, data=payload)
-        mempool_data = response.json()["result"]
+    def get_mempool_txids(self)-> list:
+        """Fetches transaction IDs from the mempool."""
+        response = self.rpc_call("getrawmempool")
+        mempool_transaction_ids = list(response["result"])
+        return mempool_transaction_ids
+    
 
-        fee_rates = []
+    def get_whale_transactions(self, threshold: int = 1000000)-> list:
+        """Fetches transactions from the mempool that are above the threshold."""
+        mempool_txids = self.get_mempool_txids()
+        DB_PATH = "/media/henning/Volume/Programming/projectX/src/mempol_transactions.db"
 
-        for txid, tx_data in mempool_data.items():
-            fee = tx_data["fees"]["base"]  # Fee in BTC
-            vsize = tx_data["vsize"]  # Virtual size in vBytes
-            fee_rate = (fee * 1e8) / vsize  # Convert BTC to sat and divide by vBytes
-            fee_rates.append(fee_rate)
+        create_table(DB_PATH, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        txid TEXT,
+                        total_sent REAL)''')
 
-        return fee_rates
-    """
+        for txid in mempool_txids:
+            tx_data = self.rpc_call("getrawtransaction", [txid, True])
+            if "result" in tx_data and tx_data["error"] is None:
+                sum_btc_sent = sum([out["value"] for out in tx_data["result"]["vout"]])
+                store_data(DB_PATH, "INSERT INTO mempool_transactions (txid, total_sent) VALUES (?, ?)", (txid, sum_btc_sent))
+        return True
