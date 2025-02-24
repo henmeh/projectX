@@ -1,5 +1,6 @@
 import socket
 import pandas as pd
+import multiprocessing
 from bitcoinrpc.authproxy import AuthServiceProxy
 import requests
 import math
@@ -79,7 +80,7 @@ class Mempool():
     def rpc_batch_call(self, method: str, params: list) -> json:
         """Helper function to call Bitcoin Core RPC with batch requests"""
         rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}")
-        batch = [{ "method": method, "params": params, "id": i } for i, params in enumerate(params)]
+        batch = [[method, params, True] for params in params]
         return rpc.batch_(batch)
     
 
@@ -90,7 +91,7 @@ class Mempool():
         return mempool_transaction_ids
     
 
-    def get_whale_transactions(self, threshold: int = 1000000)-> list:
+    def get_whale_transactions(self, threshold: int = 2)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
         DB_PATH = "/media/henning/Volume/Programming/projectX/src/mempol_transactions.db"
@@ -99,10 +100,13 @@ class Mempool():
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         txid TEXT,
                         total_sent REAL)''')
+    
+        for i in range(0, len(mempool_txids), 100):
+            txids = mempool_txids[i:i+100]
+            tx_data = self.rpc_batch_call("getrawtransaction", [txid for txid in txids])
+            for tx in tx_data:
+                sum_btc_sent = sum([out["value"] for out in tx["vout"]])
+                if sum_btc_sent > threshold:
+                    store_data(DB_PATH, "INSERT INTO mempool_transactions (txid, total_sent) VALUES (?, ?)", (tx["txid"], float(sum_btc_sent)))
 
-        for txid in mempool_txids:
-            tx_data = self.rpc_call("getrawtransaction", [txid, True])
-            if "result" in tx_data and tx_data["error"] is None:
-                sum_btc_sent = sum([out["value"] for out in tx_data["result"]["vout"]])
-                store_data(DB_PATH, "INSERT INTO mempool_transactions (txid, total_sent) VALUES (?, ?)", (txid, sum_btc_sent))
         return True
