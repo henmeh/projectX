@@ -21,7 +21,6 @@ import json
 #print(tx_info)
 
 
-mempool = Mempool()
 
 # Fetch mempool data
 #fee_rates = mempool.get_mempool_feerates()
@@ -37,5 +36,56 @@ mempool = Mempool()
 #print(mempool_size)
 #print(tx_count)
 
-test = mempool.get_whale_transactions()
-print(test)
+#test = mempool.get_whale_transactions()
+#print(test)
+
+
+from bitcoinrpc.authproxy import AuthServiceProxy
+import time
+from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
+
+
+# Connect with long timeout
+
+from bitcoinrpc.authproxy import AuthServiceProxy
+import multiprocessing
+import time
+
+# Bitcoin RPC connection
+rpc = AuthServiceProxy(f"http://{RPC_USER}:{RPC_PASSWORD}@{RPC_HOST}", timeout=300)
+
+def fetch_transactions(txid_chunk):
+    """Fetch raw transactions for a chunk of txids using batch call."""
+    batch = [["getrawtransaction", txid, True] for txid in txid_chunk]
+    try:
+        return rpc.batch_(batch)
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return None
+
+def parallel_fetch_mempool_data(txids, num_workers=4, chunk_size=50):
+    """Fetch mempool transactions in parallel."""
+    start_time = time.time()
+
+    # Split into chunks
+    chunks = [txids[i:i + chunk_size] for i in range(0, len(txids), chunk_size)]
+
+    # Use multiprocessing to fetch in parallel
+    with multiprocessing.Pool(num_workers) as pool:
+        results = pool.map(fetch_transactions, chunks)
+
+    # Flatten results (remove None values)
+    tx_data = [tx for batch in results if batch for tx in batch]
+
+    print(f"✅ Fetched {len(tx_data)} transactions in {time.time() - start_time:.2f} sec")
+    return tx_data
+
+# Run the parallel fetch
+#test = parallel_fetch_mempool_data(mempool_txids, num_workers=4, chunk_size=150)
+
+if __name__ == "__main__":
+    # Get mempool txids
+    mempool = Mempool()
+    #mempool_txids = mempool.get_mempool_txids()
+    #parallel_fetch_mempool_data(mempool_txids, num_workers=4, chunk_size=150)
+    mempool.get_whale_transactions()

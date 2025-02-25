@@ -17,6 +17,13 @@ class Mempool():
         self.rpc_user = RPC_USER
         self.rpc_password = RPC_PASSWORD
         self.rpc_host = RPC_HOST
+        self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempol_transactions.db"
+        try:
+            self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
+            print("✅ RPC Connection Established!")
+        except Exception as e:
+            print(f"❌ RPC Connection Failed: {e}")
+            self.rpc = None
 
 
     def get_mempool_feerates(self) -> json:
@@ -79,34 +86,57 @@ class Mempool():
 
     def rpc_batch_call(self, method: str, params: list) -> json:
         """Helper function to call Bitcoin Core RPC with batch requests"""
-        rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}")
-        batch = [[method, params, True] for params in params]
-        return rpc.batch_(batch)
+        batch = [[method, param, True] for param in params]
+        try:
+            responses = self.rpc.batch_(batch)
+            return responses
+        except Exception as e:
+            print(f"RPC Error: {e}")
+            return []
+
+    def process_tx_batch(self, txids, threshold, db_path):
+        """Processes a batch of transactions and stores results in the database."""
+        tx_data = self.rpc_batch_call("getrawtransaction", txids)
+        for tx in tx_data:
+            sum_btc_sent = sum([out["value"] for out in tx["vout"]])
+            if sum_btc_sent > threshold:
+                store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], len(tx["vin"]), len(tx["vout"]), float(sum_btc_sent)))
     
 
     def get_mempool_txids(self)-> list:
         """Fetches transaction IDs from the mempool."""
-        response = self.rpc_call("getrawmempool")
-        mempool_transaction_ids = list(response["result"])
-        return mempool_transaction_ids
+        try:
+            response = self.rpc_call("getrawmempool")
+            mempool_transaction_ids = list(response["result"])
+            return mempool_transaction_ids 
+        except Exception as e:
+            print(f"Error fetching mempool txids: {e}")
+            return []
     
 
-    def get_whale_transactions(self, threshold: int = 2)-> list:
+    def get_whale_transactions(self, threshold: int=10, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
-        DB_PATH = "/media/henning/Volume/Programming/projectX/src/mempol_transactions.db"
-
-        create_table(DB_PATH, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
+        
+        create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         txid TEXT,
+                        size INTEGER,
+                        vsize INTEGER,
+                        weight INTEGER,
+                        num_tx_in INTEGER,
+                        num_tx_out INTEGER,
                         total_sent REAL)''')
-    
-        for i in range(0, len(mempool_txids), 100):
-            txids = mempool_txids[i:i+100]
-            tx_data = self.rpc_batch_call("getrawtransaction", [txid for txid in txids])
-            for tx in tx_data:
-                sum_btc_sent = sum([out["value"] for out in tx["vout"]])
-                if sum_btc_sent > threshold:
-                    store_data(DB_PATH, "INSERT INTO mempool_transactions (txid, total_sent) VALUES (?, ?)", (tx["txid"], float(sum_btc_sent)))
+
+        for i in range(0, len(mempool_txids), batch_size):
+            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_mempool_transactions_path)
+        
+        """
+        num_workers = 4
+        txid_chunks = [mempool_txids[i:i+batch_size] for i in range(0, len(mempool_txids), batch_size)]
+
+        with multiprocessing.Pool(processes=num_workers) as pool:
+            pool.map(self.process_tx_batch(mempool_txids, threshold, self.db_mempool_transactions_path), [(chunk, threshold, self.db_mempool_transactions_path) for chunk in txid_chunks])
+        """
 
         return True
