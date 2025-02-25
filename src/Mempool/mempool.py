@@ -94,14 +94,57 @@ class Mempool():
             print(f"RPC Error: {e}")
             return []
 
+
+    def get_transaction_fee(self, txid):
+        """Fetches the fee and fee rate of a transaction in the mempool."""
+        try:
+            tx = self.rpc_call("getrawtransaction", [txid, True])
+            if "error" in tx and tx["error"]:
+                print(f"Skipping {txid}: {tx['error']['message']}")
+                return None
+
+            vsize = tx["result"]["vsize"]
+
+            output_sum = sum([out["value"] for out in tx["result"]["vout"]]) * 1e8  
+
+            input_sum = 0
+            for vin in tx["result"]["vin"]:
+                if "txid" in vin and "vout" in vin:
+                    prev_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])
+                    if "error" in prev_tx and prev_tx["error"]:
+                        print(f"Skipping input {vin['txid']}: {prev_tx['error']['message']}")
+                        continue
+                    input_sum += prev_tx["result"]["vout"][vin["vout"]]["value"] * 1e8  
+
+            fee = input_sum - output_sum
+            fee_rate = fee / vsize if vsize > 0 else 0 
+
+            return {"txid": txid, "fee": fee, "fee_rate": fee_rate}
+        
+        except Exception as e:
+            print(f"Error fetching fee for {txid}: {e}")
+            return None
+
+    
+    
     def process_tx_batch(self, txids, threshold, db_path):
         """Processes a batch of transactions and stores results in the database."""
         tx_data = self.rpc_batch_call("getrawtransaction", txids)
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
+            sum_btc_input = 0
             if sum_btc_sent > threshold:
-                store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], len(tx["vin"]), len(tx["vout"]), float(sum_btc_sent)))
-    
+                for vin in tx["vin"]:
+                    if "txid" in vin and "vout" in vin:
+                        vin_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])
+                        vin_out = vin_tx["result"]["vout"][vin["vout"]]
+                        sum_btc_input += vin_out["value"]
+                        fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
+                        fee_per_vbyte = fee_paid / tx["vsize"]
+                        print(tx)
+                        break
+                        #store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, fee_paid, fee_per_vbyte, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], len(tx["vin"]), len(tx["vout"]), fee_paid, fee_per_vbyte, float(sum_btc_sent)))
+        
 
     def get_mempool_txids(self)-> list:
         """Fetches transaction IDs from the mempool."""
@@ -126,6 +169,8 @@ class Mempool():
                         weight INTEGER,
                         num_tx_in INTEGER,
                         num_tx_out INTEGER,
+                        fee_paid REAL,
+                        fee_per_vbyte REAL,
                         total_sent REAL)''')
 
         for i in range(0, len(mempool_txids), batch_size):
