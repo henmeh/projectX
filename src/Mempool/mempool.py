@@ -1,8 +1,9 @@
 import socket
 from bitcoinrpc.authproxy import AuthServiceProxy
+import matplotlib.pyplot as plt
 import requests
 import json
-from Helper.helperfunctions import create_table, store_data
+from Helper.helperfunctions import create_table, store_data, fetch_data
 from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
 
 
@@ -39,10 +40,10 @@ class Mempool():
                 create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_fee_histogram (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        histogram ARRAY,
-                        fast_fee_rate REAL,
-                        medium_fee_rate REAL,
-                        low_fee_rate REAL)''')
+                        histogram TEXT,
+                        fast_fee REAL,
+                        medium_fee REAL,
+                        low_fee REAL)''')
                 
                 total_vsize = 0
                 vsize_25 = block_vsize_limit * 0.25  # Fast: Top 25%
@@ -65,17 +66,37 @@ class Mempool():
                     if total_vsize >= block_vsize_limit:
                         break
 
-                store_data(self.db_mempool_transactions_path, "INSERT INTO mempool_fee_histogram (histogram, fast_fee, medium_fee, slow_fee) VALUES (?, ?, ?, ?)", (json.dumps(fee_histogram), fast_fee, medium_fee, low_fee))
+                store_data(self.db_mempool_transactions_path, "INSERT INTO mempool_fee_histogram (histogram, fast_fee, medium_fee, low_fee) VALUES (?, ?, ?, ?)", (json.dumps(fee_histogram), fast_fee, medium_fee, low_fee))
                 
                 return {
                     "fast": fast_fee,
                     "medium": medium_fee,
                     "low": low_fee
                 }        
-        
         except Exception as e:
             return f"Error: {str(e)}"
     
+
+    def plot_fee_histogram(self):
+        """Fetches and plots the mempool fee histogram."""
+        fee_histogram = fetch_data(self.db_mempool_transactions_path, "SELECT histogram FROM mempool_fee_histogram ORDER BY timestamp DESC LIMIT 1")[0][0]
+        fee_histogram_list = json.loads(fee_histogram) 
+   
+        # Extract fee rates and total vsize
+        fee_rates = [entry[0] for entry in fee_histogram_list]
+        vsizes = [entry[1] for entry in fee_histogram_list]
+
+        # Plot the histogram
+        plt.figure(figsize=(10, 6))
+        plt.bar(fee_rates, vsizes, width=1.5, color="blue", alpha=0.7)
+
+        plt.xlabel("Fee Rate (sats/vB)")
+        plt.ylabel("Total Vsize (vB)")
+        plt.title("Mempool Fee Rate Distribution")
+        plt.yscale("log")
+        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
+        
+        plt.show()
 
     def get_mempool_stats(self) -> tuple:
         """Fetches the mempool size and transaction count from Electrum server."""

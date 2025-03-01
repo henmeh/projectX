@@ -28,3 +28,13 @@ def store_data(path_to_db:str, sql_command:str, data:tuple):
     cursor.execute(sql_command, data)
     conn.commit()
     conn.close()
+
+
+def fetch_data(path_to_db:str, sql_command:str) -> list:
+    """Fetches data from the SQLite database."""
+    conn = sqlite3.connect(path_to_db)
+    cursor = conn.cursor()
+    cursor.execute(sql_command)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows

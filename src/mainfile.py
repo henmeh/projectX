@@ -23,8 +23,10 @@ import json
 
 mempool = Mempool()
 # Fetch mempool data
-fee_rates = mempool.get_mempool_feerates()
-print(fee_rates)
+#fee_rates = mempool.get_mempool_feerates()
+#print(fee_rates)
+
+mempool.plot_fee_histogram()
 
 #fast_fee = fee_rates[int(len(fee_rates) * 0.25)] if len(fee_rates) > 10 else max(fee_rates)
 #medium_fee = fee_rates[int(len(fee_rates) * 0.5)] if len(fee_rates) > 2 else fee_rates[0]  # Median
