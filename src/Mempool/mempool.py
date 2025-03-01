@@ -1,9 +1,6 @@
 import socket
-import pandas as pd
-import multiprocessing
 from bitcoinrpc.authproxy import AuthServiceProxy
 import requests
-import math
 import json
 from Helper.helperfunctions import create_table, store_data
 from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
@@ -26,25 +23,56 @@ class Mempool():
             self.rpc = None
 
 
-    def get_mempool_feerates(self) -> json:
+    def get_mempool_feerates(self, block_vsize_limit:int=1000000) -> json:
         """Fetching Feerates from local mempool"""
         request_data = {
             "id": 0,
             "method": "mempool.get_fee_histogram",
             "params": []
         }
-
         try:
             with socket.create_connection((self.electrum_host, self.electrum_port)) as sock:
                 sock.sendall(json.dumps(request_data).encode() + b'\n')
                 response = sock.recv(4096).decode()
-                fee_rates = []
-                for fee_rate, vsize in json.loads(response)["result"]:
-                    if 1 < fee_rate < 50:
-                        weight = int(math.sqrt(vsize))
-                        fee_rates.extend([fee_rate] * weight)
-                fee_rates.sort(reverse=True)
-                return fee_rates            
+                fee_histogram = json.loads(response)["result"]
+                
+                create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_fee_histogram (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        histogram ARRAY,
+                        fast_fee_rate REAL,
+                        medium_fee_rate REAL,
+                        low_fee_rate REAL)''')
+                
+                total_vsize = 0
+                vsize_25 = block_vsize_limit * 0.25  # Fast: Top 25%
+                vsize_50 = block_vsize_limit * 0.50  # Medium: Top 50%
+                vsize_75 = block_vsize_limit * 0.75  # Low: Top 75%
+
+                fast_fee = medium_fee = low_fee = None
+
+                # Sum transaction sizes and find percentiles
+                for fee_rate, vsize in fee_histogram:
+                    total_vsize += vsize
+
+                    if fast_fee is None and total_vsize >= vsize_25:
+                        fast_fee = fee_rate
+                    if medium_fee is None and total_vsize >= vsize_50:
+                        medium_fee = fee_rate
+                    if low_fee is None and total_vsize >= vsize_75:
+                        low_fee = fee_rate
+
+                    if total_vsize >= block_vsize_limit:
+                        break
+
+                store_data(self.db_mempool_transactions_path, "INSERT INTO mempool_fee_histogram (histogram, fast_fee, medium_fee, slow_fee) VALUES (?, ?, ?, ?)", (json.dumps(fee_histogram), fast_fee, medium_fee, low_fee))
+                
+                return {
+                    "fast": fast_fee,
+                    "medium": medium_fee,
+                    "low": low_fee
+                }        
+        
         except Exception as e:
             return f"Error: {str(e)}"
     
@@ -124,8 +152,7 @@ class Mempool():
         except Exception as e:
             print(f"Error fetching fee for {txid}: {e}")
             return None
-
-    
+  
     
     def process_tx_batch(self, txids, threshold, db_path):
         """Processes a batch of transactions and stores results in the database."""
@@ -186,13 +213,5 @@ class Mempool():
 
         for i in range(0, len(mempool_txids), batch_size):
             self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_mempool_transactions_path)
-        
-        """
-        num_workers = 4
-        txid_chunks = [mempool_txids[i:i+batch_size] for i in range(0, len(mempool_txids), batch_size)]
-
-        with multiprocessing.Pool(processes=num_workers) as pool:
-            pool.map(self.process_tx_batch(mempool_txids, threshold, self.db_mempool_transactions_path), [(chunk, threshold, self.db_mempool_transactions_path) for chunk in txid_chunks])
-        """
 
         return True

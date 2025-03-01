@@ -21,9 +21,11 @@ import json
 #print(tx_info)
 
 
-
+mempool = Mempool()
 # Fetch mempool data
-#fee_rates = mempool.get_mempool_feerates()
+fee_rates = mempool.get_mempool_feerates()
+print(fee_rates)
+
 #fast_fee = fee_rates[int(len(fee_rates) * 0.25)] if len(fee_rates) > 10 else max(fee_rates)
 #medium_fee = fee_rates[int(len(fee_rates) * 0.5)] if len(fee_rates) > 2 else fee_rates[0]  # Median
 #low_fee = fee_rates[-1]  # Lowest
@@ -39,7 +41,7 @@ import json
 #test = mempool.get_whale_transactions()
 #print(test)
 
-
+""""
 from bitcoinrpc.authproxy import AuthServiceProxy
 import time
 from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
@@ -55,7 +57,6 @@ import time
 rpc = AuthServiceProxy(f"http://{RPC_USER}:{RPC_PASSWORD}@{RPC_HOST}", timeout=300)
 
 def fetch_transactions(txid_chunk):
-    """Fetch raw transactions for a chunk of txids using batch call."""
     batch = [["getrawtransaction", txid, True] for txid in txid_chunk]
     try:
         return rpc.batch_(batch)
@@ -64,7 +65,6 @@ def fetch_transactions(txid_chunk):
         return None
 
 def parallel_fetch_mempool_data(txids, num_workers=4, chunk_size=50):
-    """Fetch mempool transactions in parallel."""
     start_time = time.time()
 
     # Split into chunks
@@ -89,3 +89,4 @@ if __name__ == "__main__":
     #mempool_txids = mempool.get_mempool_txids()
     #parallel_fetch_mempool_data(mempool_txids, num_workers=4, chunk_size=150)
     mempool.get_whale_transactions()
+"""
