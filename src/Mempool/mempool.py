@@ -130,20 +130,30 @@ class Mempool():
     def process_tx_batch(self, txids, threshold, db_path):
         """Processes a batch of transactions and stores results in the database."""
         tx_data = self.rpc_batch_call("getrawtransaction", txids)
+        whale_tx = []
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
             sum_btc_input = 0
             if sum_btc_sent > threshold:
                 for vin in tx["vin"]:
-                    if "txid" in vin and "vout" in vin:
-                        vin_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])
-                        vin_out = vin_tx["result"]["vout"][vin["vout"]]
-                        sum_btc_input += vin_out["value"]
-                        fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
-                        fee_per_vbyte = fee_paid / tx["vsize"]
-                        print(tx)
-                        break
-                        #store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, fee_paid, fee_per_vbyte, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], len(tx["vin"]), len(tx["vout"]), fee_paid, fee_per_vbyte, float(sum_btc_sent)))
+                    vin_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
+                    vin_out = vin_tx["vout"][vin["vout"]]
+                    sum_btc_input += float(vin_out["value"])
+                    fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
+                    fee_per_vbyte = fee_paid / tx["vsize"]
+                whale_tx.append({
+                    "txid": tx["txid"],
+                    "size": tx["size"],
+                    "vsize": tx["vsize"],
+                    "weight": tx["weight"],
+                    "num_tx_in": len(tx["vin"]),
+                    "num_tx_out": len(tx["vout"]),
+                    "fee_paid": fee_paid,
+                    "fee_per_vbyte": fee_per_vbyte,
+                    "total_sent": float(sum_btc_sent)
+                })
+        for tx in whale_tx:
+            store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, fee_paid, fee_per_vbyte, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["num_tx_in"], tx["num_tx_out"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"]))
         
 
     def get_mempool_txids(self)-> list:
@@ -163,6 +173,7 @@ class Mempool():
         
         create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                         txid TEXT,
                         size INTEGER,
                         vsize INTEGER,
