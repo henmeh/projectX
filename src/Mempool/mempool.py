@@ -16,7 +16,7 @@ class Mempool():
         self.rpc_user = RPC_USER
         self.rpc_password = RPC_PASSWORD
         self.rpc_host = RPC_HOST
-        self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempol_transactions.db"
+        self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
         try:
             self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
             print("✅ RPC Connection Established!")
