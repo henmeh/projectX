@@ -210,7 +210,7 @@ class Mempool():
             return None
   
     
-    def process_tx_batch(self, txids, threshold, db_path):
+    def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
         tx_data = self.rpc_batch_call("getrawtransaction", txids)
         whale_tx = []
@@ -218,25 +218,34 @@ class Mempool():
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
             sum_btc_input = 0
             if sum_btc_sent > threshold:
+                vin_tx_addr = []
+                vout_tx_addr = []
                 for vin in tx["vin"]:
                     vin_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
                     vin_out = vin_tx["vout"][vin["vout"]]
                     sum_btc_input += float(vin_out["value"])
                     fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
                     fee_per_vbyte = fee_paid / tx["vsize"]
+
+                    vin_tx_addr.append(vin_tx["vout"][vin["vout"]]["scriptPubKey"]["address"])
+                
+                for vout in tx["vout"]:
+                    if "address" in vout["scriptPubKey"]:
+                        vout_tx_addr.append(vout["scriptPubKey"]["address"])
+                
                 whale_tx.append({
                     "txid": tx["txid"],
                     "size": tx["size"],
                     "vsize": tx["vsize"],
                     "weight": tx["weight"],
-                    "num_tx_in": len(tx["vin"]),
-                    "num_tx_out": len(tx["vout"]),
+                    "tx_in_addr": json.dumps(vin_tx_addr),
+                    "tx_out_addr": json.dumps(vout_tx_addr),
                     "fee_paid": fee_paid,
                     "fee_per_vbyte": fee_per_vbyte,
                     "total_sent": float(sum_btc_sent)
                 })
         for tx in whale_tx:
-            store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, num_tx_in, num_tx_out, fee_paid, fee_per_vbyte, total_sent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["num_tx_in"], tx["num_tx_out"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"]))
+            store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
         
 
     def get_mempool_txids(self)-> list:
@@ -253,6 +262,7 @@ class Mempool():
     def get_whale_transactions(self, threshold: int=10, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
+        btc_price = self.fetch_btc_price()
         
         create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,13 +271,27 @@ class Mempool():
                         size INTEGER,
                         vsize INTEGER,
                         weight INTEGER,
-                        num_tx_in INTEGER,
-                        num_tx_out INTEGER,
+                        tx_in_addr ARRAY,
+                        tx_out_addr ARRAY,
                         fee_paid REAL,
                         fee_per_vbyte REAL,
-                        total_sent REAL)''')
+                        total_sent REAL,
+                        btcusd REAL)''')
 
         for i in range(0, len(mempool_txids), batch_size):
-            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_mempool_transactions_path)
+            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_mempool_transactions_path, btc_price)
 
         return True
+
+
+    def fetch_btc_price(self) -> float:
+        """Fetches the current BTC price in USD from CoinGecko."""
+        url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data['bitcoin']['usd']
+        else:
+            print(f"Error fetching BTC price: {response.status_code}")
+            return None

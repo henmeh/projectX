@@ -1,5 +1,21 @@
 #import requests
 from Mempool.mempool import Mempool
+import requests
+
+
+def fetch_btc_price():
+    url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['bitcoin']['usd']
+    else:
+        print(f"Error fetching BTC price: {response.status_code}")
+        return None
+    
+#test1 = fetch_btc_price()
+#print(test1)
 #import json
 
 # Replace with your Raspberry Pi's actual local IP
@@ -22,11 +38,16 @@ from Mempool.mempool import Mempool
 
 
 mempool = Mempool()
+mempool.get_whale_transactions()
+#test2 = mempool.fetch_btc_price()
+#print(test2)
+
+
 # Fetch mempool data
-fee_rates = mempool.get_mempool_feerates()
+#fee_rates = mempool.get_mempool_feerates()
 #print(fee_rates)
 
-mempool.plot_fee_histogram_history()
+#mempool.plot_fee_histogram_history()
 
 #fast_fee = fee_rates[int(len(fee_rates) * 0.25)] if len(fee_rates) > 10 else max(fee_rates)
 #medium_fee = fee_rates[int(len(fee_rates) * 0.5)] if len(fee_rates) > 2 else fee_rates[0]  # Median
