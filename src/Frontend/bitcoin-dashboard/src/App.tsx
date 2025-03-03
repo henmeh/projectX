@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { dummyTodos } from "./data/todos"
-import TodoItem from "./components/TodoItem"
 import AddTodoForm from "./components/AddTodoForm";
+import TodoList from "./components/TodoList";
 
 function App() {
 
@@ -17,6 +17,10 @@ function App() {
     ))
   }
 
+  function deleteTodo(id: number) {
+    setTodos((prevTodos) => prevTodos.filter(todo => todo.id !== id))
+  }
+
   function addTodo(title: string) {
     setTodos((prevTodos) => [
       {
@@ -28,16 +32,11 @@ function App() {
   }
 
   return (
-    <main className="py-10 h-screen">
+    <main className="py-10 h-screen overflow-auto">
       <h1 className="font-bold text-3xl text-center text-amber-500">My ToDo's</h1>
       <div className="max-w-lg mx-auto">
       <AddTodoForm onSubmit={addTodo}/>
-        <div>
-          {todos.map((todo) => <TodoItem 
-                                      key={todo.id}
-                                      todo={todo}
-                                      onCompletedChange={setToDoCompleted}/> )}
-        </div>
+      <TodoList todos={todos} onCompletedChange={setToDoCompleted} onDelete={deleteTodo}/>
       </div>
     </main>
   )
