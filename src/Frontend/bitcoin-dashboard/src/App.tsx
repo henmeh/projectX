@@ -1,48 +1,17 @@
-import { useEffect, useState } from "react"
-import { dummyTodos } from "./data/todos"
 import AddTodoForm from "./components/AddTodoForm";
 import TodoList from "./components/TodoList";
 import TodoSummary from "./components/TodoSummary";
-import { dummyTodo } from "./types/todos";
+import useTodos from "./hooks/useTodos";
 
 function App() {
 
-  const [todos, setTodos] = useState(() => {
-    const storedTodos: dummyTodo[] = JSON.parse(localStorage.getItem("todos") || "[]");
-    return storedTodos.length > 0 ? storedTodos : dummyTodos;
-  });
-
-  useEffect(() => {
-    localStorage.setItem("todos", JSON.stringify(todos));
-  }, [todos])
-
-  function setToDoCompleted(id: number, completed: boolean) {
-    setTodos((prevTodos) => prevTodos.map((todo) => {
-      if (todo.id === id) {
-        return { ...todo, completed }
-      }
-      return todo;
-    }
-    ))
-  }
-
-  function deleteTodo(id: number) {
-    setTodos((prevTodos) => prevTodos.filter(todo => todo.id !== id))
-  }
-
-  function deleteAllCompleted() {
-    setTodos((prevTodos) => prevTodos.filter(todo => !todo.completed))
-  }
-
-  function addTodo(title: string) {
-    setTodos((prevTodos) => [
-      {
-        id: Date.now(),
-        title,
-        completed: false,
-      },     
-      ...prevTodos]);
-  }
+  const {
+    todos,
+    setToDoCompleted,
+    deleteTodo,
+    deleteAllCompleted,
+    addTodo
+  } = useTodos();
 
   return (
     <main className="py-10 h-screen overflow-auto">
