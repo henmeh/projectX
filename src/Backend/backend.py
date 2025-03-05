@@ -34,7 +34,7 @@ def read_root():
 @app.get("/whale-transactions/")
 def get_whale_transactions(min_btc: float = 10.0):
     """Fetches whale transactions above a given threshold."""
-    query = "SELECT id timestamp, txid, total_sent FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
+    query = "SELECT id, timestamp, txid, total_sent FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
     transactions = fetch_data(query, (min_btc,))
     return {"whale_transactions": [{"db_id": t[0], "timestamp": t[1], "txid": t[2], "total_sent": t[3]} for t in transactions]}
 
