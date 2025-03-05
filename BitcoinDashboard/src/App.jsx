@@ -1,35 +1,30 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Layout, Row, Col, Card } from "antd";
+import WhaleTransactions from "./components/WhaleTransactions";
+import FeeHistogram from "./components/FeeHistogram";
+
+const { Header, Content, Footer } = Layout;
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <Layout>
+      <Header style={{ color: "white", fontSize: "20px" }}>Bitcoin Analytics</Header>
+      <Content style={{ padding: "20px" }}>
+        <Row gutter={[16, 16]} justify="space-around">
+          <Col xs={24} sm={12} md={12} lg={12}>
+            <Card title="Whale Transactions" bordered={false}>
+              <WhaleTransactions />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={12} lg={10}>
+            <Card title="Fee Histogram" bordered={false}>
+              <FeeHistogram />
+            </Card>
+          </Col>
+        </Row>
+      </Content>
+      <Footer style={{ textAlign: "center" }}>©2025 Bitcoin Dashboard</Footer>
+    </Layout>
+  );
 }
 
-export default App
+export default App;
