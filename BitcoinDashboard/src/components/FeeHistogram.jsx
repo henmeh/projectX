@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
 import { Bar } from "@ant-design/plots";
-import { fetchFeeHistogram } from "../utils/api";
-import { Card, Spin } from "antd";
+import { fetchFeeHistogram, fetchMempoolCongestion } from "../utils/api";
+import { Card, Spin, Typography } from "antd";
+
+const { Text } = Typography;
 
 export default function FeeHistogram() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [congestion, setCongestion] = useState(null);
 
     useEffect(() => {
-        // Function to load and update the data
         async function loadData() {
             try {
+                // Fetch fee histogram
                 const response = await fetchFeeHistogram();
                 if (response && response.histogram) {
                     const formattedData = response.histogram.map(([feeRate, vsize]) => ({
@@ -19,23 +22,20 @@ export default function FeeHistogram() {
                     }));
                     setData(formattedData);
                 }
+
+                // Fetch mempool congestion data
+                const congestionResponse = await fetchMempoolCongestion();
+                if (congestionResponse) {
+                    setCongestion(congestionResponse);
+                }
             } catch (error) {
-                console.error("Error fetching fee histogram:", error);
+                console.error("Error fetching data:", error);
             }
             setLoading(false);
         }
 
-        // Initial load of data
         loadData();
-
-        // Set interval to reload the data every 60 seconds
-        const intervalId = setInterval(() => {
-            loadData();
-        }, 60000); // 60,000ms = 1 minute
-
-        // Cleanup function to clear the interval when the component unmounts
-        return () => clearInterval(intervalId);
-    }, []); // Empty dependency array ensures this only runs once on mount
+    }, []);
 
     const config = {
         data,
@@ -58,8 +58,35 @@ export default function FeeHistogram() {
     };
 
     return (
-        <Card title="Fee Histogram" style={{ marginBottom: 20 }}>
-            {loading ? <Spin size="large" /> : <Bar {...config} />}
-        </Card>
+        <div>
+            <Card title="Fee Histogram" style={{ marginBottom: 20 }}>
+                {loading ? (
+                    <Spin size="large" />
+                ) : (
+                    <Bar {...config} />
+                )}
+            </Card>
+
+            <Card title="Mempool Congestion" style={{ marginBottom: 20 }}>
+                {loading ? (
+                    <Spin size="large" />
+                ) : (
+                    congestion && (
+                        <div>
+                            <p>
+                                <Text strong style={{ fontSize: "16px" }}>
+                                    Mempool Congestion Status: {congestion.congestion_status} 
+                                </Text>    
+                            </p>
+                            <p>
+                                <Text strong style={{ fontSize: "16px" }}>
+                                    Total Size: ({congestion.total_vsize} vB)
+                                </Text> 
+                            </p>
+                        </div>                    
+                    )
+                )}
+            </Card>
+        </div>
     );
 }

@@ -20,5 +20,14 @@ export async function fetchFeeHistogram() {
         console.error("Error fetching whale transactions:", error);
         return [];
       }
-}
+};
 
+export async function fetchMempoolCongestion() {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/mempool-congestion`);
+        return response.data;
+      } catch (error) {
+        console.error("Error fetching whale transactions:", error);
+        return [];
+      }
+}
