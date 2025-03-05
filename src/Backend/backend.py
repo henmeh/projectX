@@ -1,9 +1,20 @@
+
 from fastapi import FastAPI
 import sqlite3
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins, change this to ["http://localhost:5173"] if needed
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all HTTP methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 DB_PATH = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
 
@@ -22,10 +33,20 @@ def read_root():
 
 @app.get("/whale-transactions/")
 def get_whale_transactions(min_btc: float = 10.0):
-    """Fetches whale transactions above a given threshold."""
-    query = "SELECT timestamp, txid, total_sent FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
+    """Fetches unique whale transactions above a given threshold, keeping only the latest instance of each txid."""
+    query = """
+        SELECT id, txid, MAX(timestamp), total_sent 
+        FROM mempool_transactions 
+        WHERE total_sent >= ? 
+        GROUP BY txid 
+        ORDER BY MAX(timestamp) DESC
+    """
     transactions = fetch_data(query, (min_btc,))
-    return {"whale_transactions": [{"timestamp": t[0], "txid": t[1], "total_sent": t[2]} for t in transactions]}
+    return {
+        "whale_transactions": [
+            {"dbid": t[0],"txid": t[1], "timestamp": t[2], "total_sent": t[3]} for t in transactions
+        ]
+    }
 
 @app.get("/fee-histogram/")
 def get_fee_histogram():
