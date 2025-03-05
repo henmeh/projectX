@@ -8,6 +8,7 @@ export default function FeeHistogram() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Function to load and update the data
         async function loadData() {
             try {
                 const response = await fetchFeeHistogram();
@@ -23,8 +24,18 @@ export default function FeeHistogram() {
             }
             setLoading(false);
         }
+
+        // Initial load of data
         loadData();
-    }, []);
+
+        // Set interval to reload the data every 60 seconds
+        const intervalId = setInterval(() => {
+            loadData();
+        }, 60000); // 60,000ms = 1 minute
+
+        // Cleanup function to clear the interval when the component unmounts
+        return () => clearInterval(intervalId);
+    }, []); // Empty dependency array ensures this only runs once on mount
 
     const config = {
         data,
