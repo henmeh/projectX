@@ -34,9 +34,9 @@ def read_root():
 @app.get("/whale-transactions/")
 def get_whale_transactions(min_btc: float = 10.0):
     """Fetches whale transactions above a given threshold."""
-    query = "SELECT id, timestamp, txid, total_sent FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
+    query = "SELECT id, timestamp, txid, total_sent, fee_paid, fee_per_vbyte, tx_in_addr, tx_out_addr FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
     transactions = fetch_data(query, (min_btc,))
-    return {"whale_transactions": [{"db_id": t[0], "timestamp": t[1], "txid": t[2], "total_sent": t[3]} for t in transactions]}
+    return {"whale_transactions": [{"db_id": t[0], "timestamp": t[1], "txid": t[2], "total_sent": t[3], "fee_paid": t[4], "fee_per_vbyte": t[5], "tx_in_addr": t[6], "tx_out_addr": t[7]} for t in transactions]}
 
 @app.get("/fee-histogram/")
 def get_fee_histogram():

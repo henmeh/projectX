@@ -58,8 +58,12 @@ export default function FeeHistogram() {
     };
 
     return (
-        <div>
-            <Card title="Fee Histogram" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
+            {/* Fee Histogram Card */}
+            <Card
+                title="Fee Histogram"
+                style={{ flex: 1, minWidth: "300px" }}
+            >
                 {loading ? (
                     <Spin size="large" />
                 ) : (
@@ -67,7 +71,11 @@ export default function FeeHistogram() {
                 )}
             </Card>
 
-            <Card title="Mempool Congestion" style={{ marginBottom: 20 }}>
+            {/* Mempool Congestion Card */}
+            <Card
+                title="Mempool Congestion"
+                style={{ flex: 1, minWidth: "300px" }}
+            >
                 {loading ? (
                     <Spin size="large" />
                 ) : (
@@ -75,15 +83,15 @@ export default function FeeHistogram() {
                         <div>
                             <p>
                                 <Text strong style={{ fontSize: "16px" }}>
-                                    Mempool Congestion Status: {congestion.congestion_status} 
-                                </Text>    
+                                    Mempool Congestion: {congestion.congestion_status}
+                                </Text>
                             </p>
                             <p>
                                 <Text strong style={{ fontSize: "16px" }}>
-                                    Total Size: ({congestion.total_vsize} vB)
-                                </Text> 
+                                    Total Size: {congestion.total_vsize} vB
+                                </Text>
                             </p>
-                        </div>                    
+                        </div>
                     )
                 )}
             </Card>
