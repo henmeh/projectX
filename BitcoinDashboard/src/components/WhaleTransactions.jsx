@@ -21,6 +21,11 @@ export default function WhaleTransactions() {
     }
 
     loadTransactions();
+
+    // Set interval to fetch data every 60 seconds
+    const interval = setInterval(loadTransactions, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Format txid (show first 5 + last 5 chars)

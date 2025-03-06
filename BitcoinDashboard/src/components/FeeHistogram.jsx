@@ -35,6 +35,11 @@ export default function FeeHistogram() {
         }
 
         loadData();
+
+        // Set interval to fetch data every 60 seconds
+        const interval = setInterval(loadData, 60000);
+    
+        return () => clearInterval(interval);
     }, []);
 
     const config = {

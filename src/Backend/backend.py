@@ -31,12 +31,24 @@ def fetch_data(query: str, params=()):
 def read_root():
     return {"message": "Bitcoin Analytics API"}
 
+
 @app.get("/whale-transactions/")
 def get_whale_transactions(min_btc: float = 10.0):
     """Fetches whale transactions above a given threshold."""
     query = "SELECT id, timestamp, txid, total_sent, fee_paid, fee_per_vbyte, tx_in_addr, tx_out_addr FROM mempool_transactions WHERE total_sent >= ? ORDER BY timestamp DESC"
     transactions = fetch_data(query, (min_btc,))
     return {"whale_transactions": [{"db_id": t[0], "timestamp": t[1], "txid": t[2], "total_sent": t[3], "fee_paid": t[4], "fee_per_vbyte": t[5], "tx_in_addr": t[6], "tx_out_addr": t[7]} for t in transactions]}
+
+
+@app.get("/fee-estimation/")
+def get_fee_estimation():
+    """Fetches Fee Estimation for fast, medium and slow transactiosn."""
+    query = "SELECT id, timestamp, fast_fee, medium_fee, low_fee FROM mempool_fee_histogram ORDER BY timestamp DESC"
+    result = fetch_data(query)
+    if result:
+        id, timestamp, fast_fee, medium_fee, low_fee = result[0]
+        return {"timestamp": timestamp, "fast_fee": fast_fee, "medium_fee": medium_fee, "low_fee": low_fee}
+    return {"error": "No data available"}
 
 @app.get("/fee-histogram/")
 def get_fee_histogram():
@@ -47,6 +59,7 @@ def get_fee_histogram():
         timestamp, histogram = result[0]
         return {"timestamp": timestamp, "histogram": eval(histogram)}  # Convert string back to list
     return {"error": "No data available"}
+
 
 @app.get("/mempool-congestion/")
 def get_mempool_congestion():
@@ -63,6 +76,7 @@ def get_mempool_congestion():
     congestion_status = "High" if total_vsize > 1_000_000 else "Low"
 
     return {"timestamp": timestamp, "congestion_status": congestion_status, "total_vsize": total_vsize}
+
 
 if __name__ == "__main__":
     import uvicorn
