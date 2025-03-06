@@ -98,9 +98,22 @@ export default function WhaleTransactions() {
       dataIndex: "total_sent",
       key: "total_sent",
       width: 150,
-      render: (text) => Number(text).toFixed(8),
+      render: (text) => Number(text).toFixed(3),
     },
-    
+    {
+        title: "Total Fee (sats)",
+        dataIndex: "fee_paid",
+        key: "fee_paid",
+        width: 150,
+        render: (text) => Number(text).toFixed(3),
+    },
+    {
+    title: "rel. Fee (sats/vbyte)",
+    dataIndex: "fee_per_vbyte",
+    key: "fee_per_vbyte",
+    width: 150,
+    render: (text) => Number(text).toFixed(3),
+    },
   ];
 
   return (
