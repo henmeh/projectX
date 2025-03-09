@@ -1,12 +1,11 @@
 import socket
 from bitcoinrpc.authproxy import AuthServiceProxy
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import requests
 import json
-from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
 from Helper.helperfunctions import create_table, store_data, fetch_data
 
 
