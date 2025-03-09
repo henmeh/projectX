@@ -1,5 +1,5 @@
 import time
-from Mempool.mempool import Mempool
+from mempool import Mempool
 
 
 if __name__ == "__main__":

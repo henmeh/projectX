@@ -1,5 +1,7 @@
 import pandas as pd
 from collections import Counter
+import sys
+sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import fetch_whale_transactions
 
 class MempoolAnalysis():
@@ -12,9 +14,12 @@ class MempoolAnalysis():
         except Exception as e:
             print(f"❌ RPC Connection Failed: {e}")
             self.whale_transactions = []
-            
+
     
-    def whale_behavior_patterns(self):
+    def whale_behavior_patterns(self) -> list:
+        """
+        Analysing Whale transactions for recurring patterns
+        """
         # Convert to DataFrame
         df = pd.DataFrame(self.whale_transactions)
 
@@ -39,11 +44,11 @@ class MempoolAnalysis():
 
         # Count occurrences of input (sending) addresses
         input_counts = Counter(all_inputs)
-        top_senders = input_counts.most_common(1)  # Top 10 frequent senders
+        top_senders = input_counts.most_common(10)  # Top 10 frequent senders
 
         # Count occurrences of output (receiving) addresses
         output_counts = Counter(all_outputs)
-        top_receivers = output_counts.most_common(1)  # Top 10 frequent receivers
+        top_receivers = output_counts.most_common(10)  # Top 10 frequent receivers
 
         # Identify addresses that frequently send & receive BTC
         recurring_addresses = set(input_counts.keys()) & set(output_counts.keys())
@@ -52,17 +57,19 @@ class MempoolAnalysis():
         df["hour"] = df["timestamp"].dt.hour  # Extract hour from timestamp
         whale_activity_by_hour = df["hour"].value_counts().sort_index()
 
-        # Print Results
-        print("📌 Top 10 Whale Senders:")
-        for addr, count in top_senders:
-            print(f"{addr}: {count} transactions")
+        return top_senders, top_receivers, recurring_addresses, whale_activity_by_hour
+        
 
-        print("\n📌 Top 10 Whale Receivers:")
-        for addr, count in top_receivers:
-            print(f"{addr}: {count} transactions")
-
-        print("\n🔁 Recurring Addresses (Sending & Receiving):")
-        print(list(recurring_addresses)[:10])  # Show first 10 recurring addresses
-
-        print("\n⏳ Whale Activity by Hour:")
-        print(whale_activity_by_hour)
+    def detect_unusual_activity(self, threshold: int=100)-> list:
+        """
+        Identify unusually large transactions
+        """
+        unusual_activity = []
+        
+        for tx in self.whale_transactions:
+            total_sent = tx["total_sent"]
+            
+            if total_sent >= threshold:
+                unusual_activity.append(tx)
+        
+        return unusual_activity

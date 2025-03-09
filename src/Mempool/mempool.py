@@ -4,8 +4,10 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import requests
 import json
-from Helper.helperfunctions import create_table, store_data, fetch_data
 from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
+import sys
+sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+from Helper.helperfunctions import create_table, store_data, fetch_data
 
 
 class Mempool():
@@ -99,39 +101,6 @@ class Mempool():
         
         plt.show()
     
-
-    def plot_fee_histogram_history(self):
-        """Fetches and plots the historical mempool fee histogram in a single plot."""
-        fee_histogram_history = fetch_data(self.db_mempool_transactions_path, "SELECT timestamp, histogram FROM mempool_fee_histogram")
-
-        plt.figure(figsize=(10, 6))
-
-        legend_patches = []
-
-        colors = plt.cm.viridis_r(range(0, 256, max(1, 256 // max(1, len(fee_histogram_history)))))
-
-        for i, (timestamp, fee_histogram) in enumerate(fee_histogram_history):
-            fee_histogram_list = json.loads(fee_histogram) 
-            
-            fee_rates = [entry[0] for entry in fee_histogram_list]
-            vsizes = [entry[1] for entry in fee_histogram_list]
-
-            color = colors[i % len(colors)]  # Cycle through colors
-            plt.bar(fee_rates, vsizes, width=1.5, alpha=0.3, color=color)
-
-            legend_patches.append(mpatches.Patch(color=color, label=f"Timestamp: {timestamp}"))
-
-        plt.xlabel("Fee Rate (sats/vB)")
-        plt.ylabel("Total Vsize (vB)")
-        plt.title("Mempool Fee Rate Distribution Over Time")
-        plt.yscale("log")
-        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
-
-        if legend_patches:
-            plt.legend(handles=legend_patches, loc="upper right", fontsize="small")
-
-        plt.show()
-
 
     def get_mempool_stats(self) -> tuple:
         """Fetches the mempool size and transaction count from Electrum server."""
