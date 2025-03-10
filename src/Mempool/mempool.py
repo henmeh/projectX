@@ -6,8 +6,8 @@ import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
-from Helper.helperfunctions import create_table, store_data, fetch_data, send_telegram_alert
-import datetime
+from Helper.helperfunctions import create_table, store_data, fetch_data
+from WhaleTracking.whale_alert import WhaleAlerts
 
 
 class Mempool():
@@ -19,6 +19,7 @@ class Mempool():
         self.rpc_password = RPC_PASSWORD
         self.rpc_host = RPC_HOST
         self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
+        self.whale_alert = WhaleAlerts()
         try:
             self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
             print("✅ RPC Connection Established!")
@@ -215,18 +216,7 @@ class Mempool():
                 })
 
                 if sum_btc_sent >= alert_threshold:
-                    # Construct alert message
-                    message = (
-                        f"🚨 *Whale Alert!* 🚨\n"
-                        f"💰 *{sum_btc_sent} BTC* transferred!\n"
-                        f"📥 *From:* {', '.join(vin_tx_addr[:3])}...\n"
-                        f"📤 *To:* {', '.join(vout_tx_addr[:3])}...\n"
-                        f"⏳ *Time:* {datetime.datetime.now()}\n"
-                        f"🔗 [View Transaction](https://mempool.space/tx/{tx['txid']})"
-                    )
-
-                    # Send alert
-                    send_telegram_alert(message)
+                    self.whale_alert.detect_unusual_activity({"sum_btc_sent": sum_btc_sent, "tx_in_addr": vin_tx_addr, "tx_out_addr": vout_tx_addr, "txid": tx["txid"]})
 
         for tx in whale_tx:
             store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
@@ -243,7 +233,7 @@ class Mempool():
             return []
     
 
-    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=100, batch_size=25)-> list:
+    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=500, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
         btc_price = self.fetch_btc_price()
