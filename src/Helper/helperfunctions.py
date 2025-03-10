@@ -1,8 +1,12 @@
 import hashlib
+import requests
 import base58
 import sqlite3
 from datetime import datetime, timedelta
 import json
+import sys
+sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+from node_data import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
 
 def address_to_scripthash(address:str) -> str:
@@ -85,3 +89,10 @@ def fetch_whale_transactions(db_mempool_transactions_path: str, days: int) -> li
 
         conn.close()
         return transactions
+
+
+def send_telegram_alert(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    response = requests.post(url, json=payload)
+    return response.json()

@@ -6,7 +6,8 @@ import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
-from Helper.helperfunctions import create_table, store_data, fetch_data
+from Helper.helperfunctions import create_table, store_data, fetch_data, send_telegram_alert
+import datetime
 
 
 class Mempool():
@@ -178,7 +179,7 @@ class Mempool():
             return None
   
     
-    def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
+    def process_tx_batch(self, txids: list, threshold: int, alert_threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
         tx_data = self.rpc_batch_call("getrawtransaction", txids)
         whale_tx = []
@@ -212,6 +213,21 @@ class Mempool():
                     "fee_per_vbyte": fee_per_vbyte,
                     "total_sent": float(sum_btc_sent)
                 })
+
+                if sum_btc_sent >= alert_threshold:
+                    # Construct alert message
+                    message = (
+                        f"🚨 *Whale Alert!* 🚨\n"
+                        f"💰 *{sum_btc_sent} BTC* transferred!\n"
+                        f"📥 *From:* {', '.join(vin_tx_addr[:3])}...\n"
+                        f"📤 *To:* {', '.join(vout_tx_addr[:3])}...\n"
+                        f"⏳ *Time:* {datetime.datetime.now()}\n"
+                        f"🔗 [View Transaction](https://mempool.space/tx/{tx['txid']})"
+                    )
+
+                    # Send alert
+                    send_telegram_alert(message)
+
         for tx in whale_tx:
             store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
         
@@ -227,7 +243,7 @@ class Mempool():
             return []
     
 
-    def get_whale_transactions(self, threshold: int=10, batch_size=25)-> list:
+    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=100, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
         btc_price = self.fetch_btc_price()
@@ -247,7 +263,7 @@ class Mempool():
                         btcusd REAL)''')
 
         for i in range(0, len(mempool_txids), batch_size):
-            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_mempool_transactions_path, btc_price)
+            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, alert_threshold, self.db_mempool_transactions_path, btc_price)
 
         return True
 

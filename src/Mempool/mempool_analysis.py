@@ -4,7 +4,10 @@ from collections import defaultdict
 import sys
 import json
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import fetch_whale_transactions
+from Helper.helperfunctions import fetch_whale_transactions, store_data, create_table, fetch_data
+import networkx as nx
+import matplotlib.pyplot as plt
+import sqlite3
 
 class MempoolAnalysis():
 
@@ -77,13 +80,6 @@ class MempoolAnalysis():
         
         return unusual_activity
     
-
-from collections import defaultdict
-import pandas as pd
-import json
-from Helper.helperfunctions import fetch_whale_transactions
-
-
 class AddressClustering:
     def __init__(self, path_to_db: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days: int = 7):
         self.path_to_db = path_to_db
@@ -149,4 +145,69 @@ class AddressClustering:
         """
         self._generate_clusters(self.whale_transactions)
         return self.get_clusters()
+    
+    def store_clusters(self, clusters):
+        """Stores address cluster in db"""
+        try:
+            create_table(self.path_to_db, '''CREATE TABLE IF NOT EXISTS address_clusters (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        clusters TEXT)''')
+        
+            for cluster in clusters:
+                store_data(self.path_to_db, "INSERT INTO address_clusters (clusters) VALUES (?)", (json.dumps(cluster),))
+           
+        except Exception as e:
+            print(f"❌ Error saving clusters to database: {e}")
+    
+    def fetch_clusters(self):
+        try:
+            conn = sqlite3.connect(self.path_to_db)
+            cursor = conn.cursor()
 
+            # Fetch all clusters from the table
+            cursor.execute("SELECT clusters FROM address_clusters")
+            rows = cursor.fetchall()
+
+            # Convert the JSON string back to lists
+            clusters = [json.loads(row[0]) for row in rows]
+
+            conn.close()
+            return clusters
+
+        except Exception as e:
+            print(f"❌ Error fetching clusters: {e}")
+            return []
+
+    def visualize_clusters(self, clusters, max_nodes=5, max_edges_per_node=3):
+        """
+        Faster visualization:
+        - Limits number of nodes for performance.
+        - Reduces edges to prevent excessive connections.
+        - Uses a faster layout with limited iterations.
+        """
+        G = nx.Graph()
+
+        # Add edges between addresses in the same cluster
+        for cluster in clusters:
+            print(cluster)
+            if len(G.nodes) >= max_nodes:
+                break
+
+            cluster = list(cluster)  # Convert set to list
+            for i in range(len(cluster)):
+                for j in range(i + 1, min(i + 1 + max_edges_per_node, len(cluster))):  # Limit edges
+                    G.add_edge(cluster[i], cluster[j])
+
+                    if len(G.nodes) >= max_nodes:
+                        break
+
+        if len(G.nodes) == 0:
+            print("⚠️ No clusters to visualize!")
+            return
+
+        # Use a force-directed layout with fewer iterations
+        pos = nx.spring_layout(G, k=0.4, iterations=10)
+
+        plt.figure(figsize=(8, 8))
+        nx.draw(G, pos, with_labels=True, node_size=200, font_size=7, edge_color="gray")
+        plt.show()
