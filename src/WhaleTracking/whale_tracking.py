@@ -7,7 +7,7 @@ from Mempool.mempool import Mempool
 from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
 from datetime import datetime
 from NodeConnect.node_connect import NodeConnect
-from whale_alert import WhaleAlerts
+from .whale_alert import WhaleAlerts
 
 class WhaleTracking():
 

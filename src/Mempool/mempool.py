@@ -21,7 +21,7 @@ class Mempool():
             "params": []
         }
         try:
-            with socket.create_connection((self.electrum_host, self.electrum_port)) as sock:
+            with socket.create_connection((self.node.get_node_data()["electrum_host"], self.node.get_node_data()["electrum_port"])) as sock:
                 sock.sendall(json.dumps(request_data).encode() + b'\n')
                 response = sock.recv(4096).decode()
                 fee_histogram = json.loads(response)["result"]
@@ -91,7 +91,7 @@ class Mempool():
     def get_mempool_stats(self) -> tuple:
         """Fetches the mempool size and transaction count from Electrum server."""
         try:
-            result = self.electrum_request("mempool.get_fee_histogram")
+            result = self.node.electrum_request("mempool.get_fee_histogram")
             if "result" in result:
                 fee_histogram = result["result"]
                 total_mempool_size = sum([fee[1] for fee in fee_histogram])

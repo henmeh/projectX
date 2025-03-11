@@ -22,6 +22,10 @@ class NodeConnect():
             self.rpc = None
     
 
+    def get_node_data(self) -> dict:
+        return ({"electrum_host": self.electrum_host, "electrum_port": self.electrum_port, "rpc_user": self.rpc_user, "rpc_password": self.rpc_password, "rpc_host": self.rpc_host})
+
+
     def electrum_request(self, method: str, params=[])-> json:
         """Sends a JSON-RPC request to the Electrum server."""
         request_data = json.dumps({"id": 0, "method": method, "params": params}) + "\n"

@@ -1,4 +1,4 @@
-from mempool_analysis import AddressClustering
+from Mempool.mempool_analysis import AddressClustering
 
 # Create an AddressClustering instance
 clustering = AddressClustering()

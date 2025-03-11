@@ -1,7 +1,6 @@
 import time
 import json
-import pandas as pd
-from mempool_analysis import MempoolAnalysis
+from Mempool.mempool_analysis import MempoolAnalysis
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import create_table, store_data
