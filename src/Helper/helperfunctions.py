@@ -96,3 +96,16 @@ def send_telegram_alert(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     response = requests.post(url, json=payload)
     return response.json()
+
+
+def fetch_btc_price() -> float:
+    """Fetches the current BTC price in USD from CoinGecko."""
+    url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
+    response = requests.get(url)
+    
+    if response.status_code == 200:
+        data = response.json()
+        return data['bitcoin']['usd']
+    else:
+        print(f"Error fetching BTC price: {response.status_code}")
+        return None

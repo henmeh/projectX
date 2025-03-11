@@ -1,31 +1,18 @@
 import socket
-from bitcoinrpc.authproxy import AuthServiceProxy
 import matplotlib.pyplot as plt
-import requests
 import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from node_data import ELECTRUM_HOST, ELECTRUM_PORT, RPC_USER, RPC_PASSWORD, RPC_HOST
-from Helper.helperfunctions import create_table, store_data, fetch_data
+from Helper.helperfunctions import create_table, store_data, fetch_data, fetch_btc_price
 from WhaleTracking.whale_alert import WhaleAlerts
-
+from NodeConnect.node_connect import NodeConnect
 
 class Mempool():
 
     def __init__(self):
-        self.electrum_host = ELECTRUM_HOST
-        self.electrum_port = ELECTRUM_PORT
-        self.rpc_user = RPC_USER
-        self.rpc_password = RPC_PASSWORD
-        self.rpc_host = RPC_HOST
         self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
         self.whale_alert = WhaleAlerts()
-        try:
-            self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
-            print("✅ RPC Connection Established!")
-        except Exception as e:
-            print(f"❌ RPC Connection Failed: {e}")
-            self.rpc = None
+        self.node = NodeConnect()
 
 
     def get_mempool_feerates(self, block_vsize_limit:int=1000000) -> json:
@@ -119,40 +106,12 @@ class Mempool():
         except Exception as e:
             print(f"Error fetching mempool stats: {e}")
             return None
+ 
     
-
-    def electrum_request(self, method: str, params=[])-> json:
-        """Sends a JSON-RPC request to the Electrum server."""
-        request_data = json.dumps({"id": 0, "method": method, "params": params}) + "\n"
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((self.electrum_host, self.electrum_port))
-            s.sendall(request_data.encode("utf-8"))
-            response = s.recv(8192).decode("utf-8")
-        return json.loads(response)
-    
-
-    def rpc_call(self, method: str, params=[]) -> json:
-        """Helper function to call Bitcoin Core RPC"""
-        payload = {"jsonrpc": "1.0", "id": method, "method": method, "params": params}
-        response = requests.post(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}/", json=payload)
-        return response.json()
-    
-
-    def rpc_batch_call(self, method: str, params: list) -> json:
-        """Helper function to call Bitcoin Core RPC with batch requests"""
-        batch = [[method, param, True] for param in params]
-        try:
-            responses = self.rpc.batch_(batch)
-            return responses
-        except Exception as e:
-            print(f"RPC Error: {e}")
-            return []
-
-
     def get_transaction_fee(self, txid):
         """Fetches the fee and fee rate of a transaction in the mempool."""
         try:
-            tx = self.rpc_call("getrawtransaction", [txid, True])
+            tx = self.node.rpc_call("getrawtransaction", [txid, True])
             if "error" in tx and tx["error"]:
                 print(f"Skipping {txid}: {tx['error']['message']}")
                 return None
@@ -164,7 +123,7 @@ class Mempool():
             input_sum = 0
             for vin in tx["result"]["vin"]:
                 if "txid" in vin and "vout" in vin:
-                    prev_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])
+                    prev_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])
                     if "error" in prev_tx and prev_tx["error"]:
                         print(f"Skipping input {vin['txid']}: {prev_tx['error']['message']}")
                         continue
@@ -182,7 +141,7 @@ class Mempool():
     
     def process_tx_batch(self, txids: list, threshold: int, alert_threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
-        tx_data = self.rpc_batch_call("getrawtransaction", txids)
+        tx_data = self.node.rpc_batch_call("getrawtransaction", txids)
         whale_tx = []
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
@@ -191,7 +150,7 @@ class Mempool():
                 vin_tx_addr = []
                 vout_tx_addr = []
                 for vin in tx["vin"]:
-                    vin_tx = self.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
+                    vin_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
                     vin_out = vin_tx["vout"][vin["vout"]]
                     sum_btc_input += float(vin_out["value"])
                     fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
@@ -225,7 +184,7 @@ class Mempool():
     def get_mempool_txids(self)-> list:
         """Fetches transaction IDs from the mempool."""
         try:
-            response = self.rpc_call("getrawmempool")
+            response = self.node.rpc_call("getrawmempool")
             mempool_transaction_ids = list(response["result"])
             return mempool_transaction_ids 
         except Exception as e:
@@ -233,10 +192,10 @@ class Mempool():
             return []
     
 
-    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=500, batch_size=25)-> list:
+    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=1000, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.get_mempool_txids()
-        btc_price = self.fetch_btc_price()
+        btc_price = fetch_btc_price()
         
         create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -256,16 +215,3 @@ class Mempool():
             self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, alert_threshold, self.db_mempool_transactions_path, btc_price)
 
         return True
-
-
-    def fetch_btc_price(self) -> float:
-        """Fetches the current BTC price in USD from CoinGecko."""
-        url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            return data['bitcoin']['usd']
-        else:
-            print(f"Error fetching BTC price: {response.status_code}")
-            return None
