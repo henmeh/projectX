@@ -3,15 +3,13 @@ import matplotlib.pyplot as plt
 import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, store_data, fetch_data, fetch_btc_price
-from WhaleTracking.whale_alert import WhaleAlerts
+from Helper.helperfunctions import create_table, store_data, fetch_data
 from NodeConnect.node_connect import NodeConnect
 
 class Mempool():
 
     def __init__(self):
         self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
-        self.whale_alert = WhaleAlerts()
         self.node = NodeConnect()
 
 
@@ -137,49 +135,7 @@ class Mempool():
         except Exception as e:
             print(f"Error fetching fee for {txid}: {e}")
             return None
-  
-    
-    def process_tx_batch(self, txids: list, threshold: int, alert_threshold: int, db_path: str, btc_price: float) -> None:
-        """Processes a batch of transactions and stores results in the database."""
-        tx_data = self.node.rpc_batch_call("getrawtransaction", txids)
-        whale_tx = []
-        for tx in tx_data:
-            sum_btc_sent = sum([out["value"] for out in tx["vout"]])
-            sum_btc_input = 0
-            if sum_btc_sent > threshold:
-                vin_tx_addr = []
-                vout_tx_addr = []
-                for vin in tx["vin"]:
-                    vin_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
-                    vin_out = vin_tx["vout"][vin["vout"]]
-                    sum_btc_input += float(vin_out["value"])
-                    fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
-                    fee_per_vbyte = fee_paid / tx["vsize"]
-
-                    vin_tx_addr.append(vin_tx["vout"][vin["vout"]]["scriptPubKey"]["address"])
-                
-                for vout in tx["vout"]:
-                    if "address" in vout["scriptPubKey"]:
-                        vout_tx_addr.append(vout["scriptPubKey"]["address"])
-                
-                whale_tx.append({
-                    "txid": tx["txid"],
-                    "size": tx["size"],
-                    "vsize": tx["vsize"],
-                    "weight": tx["weight"],
-                    "tx_in_addr": json.dumps(vin_tx_addr),
-                    "tx_out_addr": json.dumps(vout_tx_addr),
-                    "fee_paid": fee_paid,
-                    "fee_per_vbyte": fee_per_vbyte,
-                    "total_sent": float(sum_btc_sent)
-                })
-
-                if sum_btc_sent >= alert_threshold:
-                    self.whale_alert.detect_unusual_activity({"sum_btc_sent": sum_btc_sent, "tx_in_addr": vin_tx_addr, "tx_out_addr": vout_tx_addr, "txid": tx["txid"]})
-
-        for tx in whale_tx:
-            store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
-        
+       
 
     def get_mempool_txids(self)-> list:
         """Fetches transaction IDs from the mempool."""
@@ -191,27 +147,3 @@ class Mempool():
             print(f"Error fetching mempool txids: {e}")
             return []
     
-
-    def get_whale_transactions(self, threshold: int=10, alert_threshold: int=1000, batch_size=25)-> list:
-        """Fetches transactions from the mempool that are above the threshold."""
-        mempool_txids = self.get_mempool_txids()
-        btc_price = fetch_btc_price()
-        
-        create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        txid TEXT,
-                        size INTEGER,
-                        vsize INTEGER,
-                        weight INTEGER,
-                        tx_in_addr ARRAY,
-                        tx_out_addr ARRAY,
-                        fee_paid REAL,
-                        fee_per_vbyte REAL,
-                        total_sent REAL,
-                        btcusd REAL)''')
-
-        for i in range(0, len(mempool_txids), batch_size):
-            self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, alert_threshold, self.db_mempool_transactions_path, btc_price)
-
-        return True

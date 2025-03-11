@@ -5,7 +5,8 @@ from Helper.helperfunctions import create_table, send_telegram_alert
 import datetime
 
 class WhaleAlerts:
-    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"):
+    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", alert_threshold=1000):
+        self.alert_threshold = alert_threshold
         self.db_path = db_path
         try:
             create_table(self.db_path, """CREATE TABLE IF NOT EXISTS alerted_transactions (txid TEXT PRIMARY KEY, timestamp TEXT)""")
@@ -13,6 +14,13 @@ class WhaleAlerts:
             print(f"❌ Database creation filed: {e}")
     
 
+    def get_alert_threshold(self) -> int:
+        """
+        Returns the threshold for the whale alert
+        """
+        return self.alert_threshold
+    
+    
     def is_alerted(self, txid):
         """Check if a transaction has already been alerted."""
         with sqlite3.connect(self.db_path) as conn:
