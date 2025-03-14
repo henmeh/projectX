@@ -4,7 +4,7 @@ from collections import Counter
 import pandas as pd
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, address_to_scripthash
 from Mempool.mempool import Mempool
 from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
 from datetime import datetime
@@ -78,27 +78,14 @@ class WhaleTracking():
         return top_senders, top_receivers, recurring_addresses, whale_activity_by_hour
   
     
-    def fetch_balances(self, whale_addresses: list) -> dict:
-        """
-        Fetch BTC balances for a list of whale addresses from the local Bitcoin node.
-        """
-        if not whale_addresses:
-            return {}
+    def fetch_balances(self, address):
 
-        try:
-            result = self.node.rpc.scantxoutset("start", [{"desc": f"addr({addr})"} for addr in whale_addresses])
-            if "unspents" in result:
-                balances = {}
-                for utxo in result["unspents"]:
-                    addr = utxo["address"]
-                    balances[addr] = balances.get(addr, 0) + utxo["amount"]
-                return balances
-        except Exception as e:
-            print(f"❌ Error fetching balances: {e}")
+        scripthash = address_to_scripthash(address)        
+        balance = self.node.electrum_request("blockchain.scripthash.get_balance", [scripthash])
+
+        return balance
         
-        return {}
     
-
     def track_wallet_balance(self, address):
         balance = self.fetch_balances(address)
         if balance is None:

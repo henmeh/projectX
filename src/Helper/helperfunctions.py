@@ -1,4 +1,6 @@
 import hashlib
+import codecs
+import bech32
 import requests
 import base58
 import sqlite3
@@ -7,14 +9,6 @@ import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from node_data import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-
-
-def address_to_scripthash(address:str) -> str:
-    """Convert a Bitcoin address to an Electrum scripthash."""
-    decoded = base58.b58decode_check(address)
-    pubkey_hash = decoded[1:]
-    scripthash = hashlib.sha256(pubkey_hash).digest()[::-1].hex()
-    return scripthash
 
 
 def create_table(path_to_db:str, sql_command:str):
@@ -108,4 +102,28 @@ def fetch_btc_price() -> float:
         return data['bitcoin']['usd']
     else:
         print(f"Error fetching BTC price: {response.status_code}")
+        return None
+
+
+def address_to_scripthash(address):
+    """Convert Bitcoin address to Electrum's scripthash format"""
+    try:
+        if address.startswith("1"):  # P2PKH Address
+            decoded = base58.b58decode_check(address).hex()
+            script = f"76a914{decoded[2:]}88ac"
+        elif address.startswith("3"):  # P2SH Address
+            decoded = base58.b58decode_check(address).hex()
+            script = f"a914{decoded[2:]}87"
+        elif address.startswith("bc1"):  # Bech32 SegWit Address
+            hrp, data = bech32.bech32_decode(address)
+            if not data:
+                raise ValueError("Invalid Bech32 address")
+            script = codecs.encode(hashlib.sha256(bytes(bech32.convertbits(data[1:], 5, 8, False))).digest(), 'hex').decode()
+        else:
+            raise ValueError(f"Unsupported address type: {address}")
+
+        scripthash = hashlib.sha256(bytes.fromhex(script)).digest()[::-1].hex()
+        return scripthash
+    except Exception as e:
+        print(f"❌ Address conversion error: {e}")
         return None
