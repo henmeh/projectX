@@ -1,13 +1,16 @@
+"""
+Tracking whale activity for whale_behavior_patterns every 24h
+"""
 import time
 import json
-from Mempool.mempool_analysis import MempoolAnalysis
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import create_table, store_data
+from WhaleTracking.whale_tracking import WhaleTracking
 
 
 if __name__ == "__main__":
-        mempool_analysis = MempoolAnalysis()
+        whale_tracking =WhaleTracking()
 
         create_table("/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", '''CREATE TABLE IF NOT EXISTS whale_analysis (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,7 +21,7 @@ if __name__ == "__main__":
                         whale_activity_by_hour TEXT)''')
 
         while True:
-                top_senders, top_receivers, recurring_addresses, whale_activity_by_hour = mempool_analysis.whale_behavior_patterns()
+                top_senders, top_receivers, recurring_addresses, whale_activity_by_hour = whale_tracking.whale_behavior_patterns()
 
                 whale_activity_by_hour_list = []
 

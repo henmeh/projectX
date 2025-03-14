@@ -1,8 +1,10 @@
 import json
 import sqlite3
+from collections import Counter
+import pandas as pd
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
 from Mempool.mempool import Mempool
 from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
 from datetime import datetime
@@ -11,23 +13,71 @@ from .whale_alert import WhaleAlerts
 
 class WhaleTracking():
 
-    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"):
+    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
         self.db_path = db_path
+        self.days = days
         self.rpc_user = RPC_USER
         self.rpc_password = RPC_PASSWORD
         self.rpc_host = RPC_HOST
         self.mempool = Mempool()
         self.whale_alert = WhaleAlerts()
-
         try:
             create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallets (address TEXT PRIMARY KEY, last_balance REAL, last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
             create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallet_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, balance REAL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (address) REFERENCES whale_wallets(address))""")
         except Exception as e:
             print(f"❌ Database creation filed: {e}")
-        
+        try:
+            self.whale_transactions = fetch_whale_transactions(self.db_path, self.days)
+        except Exception as e:
+            print(f"❌ RPC Connection Failed: {e}")
+            self.whale_transactions = []
         self.node = NodeConnect()
 
 
+    def whale_behavior_patterns(self) -> list:
+        """
+        Analysing Whale transactions for recurring patterns
+        """
+        # Convert to DataFrame
+        df = pd.DataFrame(self.whale_transactions)
+
+        # Ensure timestamps are in datetime format
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+        # Extract all input addresses
+        all_inputs = []
+        for addresses in df["tx_in_addr"]:
+            try:
+                all_inputs.extend(addresses)
+            except:
+                continue
+
+        # Extract all output addresses
+        all_outputs = []
+        for addresses in df["tx_out_addr"]:
+            try:
+                all_outputs.extend(addresses)  
+            except:
+                continue
+
+        # Count occurrences of input (sending) addresses
+        input_counts = Counter(all_inputs)
+        top_senders = input_counts.most_common(10)  # Top 10 frequent senders
+
+        # Count occurrences of output (receiving) addresses
+        output_counts = Counter(all_outputs)
+        top_receivers = output_counts.most_common(10)  # Top 10 frequent receivers
+
+        # Identify addresses that frequently send & receive BTC
+        recurring_addresses = set(input_counts.keys()) & set(output_counts.keys())
+
+        # Analyze Whale Activity by Time
+        df["hour"] = df["timestamp"].dt.hour  # Extract hour from timestamp
+        whale_activity_by_hour = df["hour"].value_counts().sort_index()
+
+        return top_senders, top_receivers, recurring_addresses, whale_activity_by_hour
+  
+    
     def fetch_balances(self, whale_addresses: list) -> dict:
         """
         Fetch BTC balances for a list of whale addresses from the local Bitcoin node.
@@ -120,7 +170,7 @@ class WhaleTracking():
             store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
 
 
-    def get_whale_transactions(self, threshold: int=10, batch_size=25)-> list:
+    def get_whale_transactions(self, threshold: int=100, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
         mempool_txids = self.mempool.get_mempool_txids()
         btc_price = fetch_btc_price()
