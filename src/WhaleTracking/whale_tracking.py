@@ -22,8 +22,9 @@ class WhaleTracking():
         self.mempool = Mempool()
         self.whale_alert = WhaleAlerts()
         try:
-            create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallets (address TEXT PRIMARY KEY, last_balance REAL, last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
-            create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallet_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, balance REAL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (address) REFERENCES whale_wallets(address))""")
+            #create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallets (address TEXT PRIMARY KEY, last_balance REAL, last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+            #create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallet_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, balance REAL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (address) REFERENCES whale_wallets(address))""")
+            create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_balance_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, confirmed_balance REAL NOT NULL, unconfirmed_balance REAL NOT NULL)""")
         except Exception as e:
             print(f"❌ Database creation filed: {e}")
         try:
@@ -78,42 +79,69 @@ class WhaleTracking():
         return top_senders, top_receivers, recurring_addresses, whale_activity_by_hour
   
     
-    def fetch_balances(self, address):
-
-        scripthash = address_to_scripthash(address)        
+    def fetch_balance(self, address: str) -> dict:
+        """Fetch the balance of a single address"""
+        scripthash = address_to_scripthash(address)
+        if not scripthash:
+            return None
+              
         balance = self.node.electrum_request("blockchain.scripthash.get_balance", [scripthash])
+        if balance:
+            confirmed = balance.get("confirmed", 0) / 1e8  # Convert satoshis to BTC
+            unconfirmed = balance.get("unconfirmed", 0) / 1e8
+            return {"confirmed": confirmed, "unconfirmed": unconfirmed}
+        return None
 
-        return balance
+
+    def fetch_balances(self, addresses: list) -> list:
+        """Fetch balances for multiple addresses"""
+        return {addr: self.fetch_balance(addr) for addr in addresses}
+    
+
+    def store_balance_history(self, address, confirmed, unconfirmed):
+        """Store balance history in the database"""
+        store_data(self.db_path, "INSERT INTO whale_balance_history (address, confirmed_balance, unconfirmed_balance) VALUES (?, ?, ?)", (address, confirmed, unconfirmed))
+
+
+    def detect_whale_trends(self, address):
+        """Analyze whale balance trends over a given period"""
+        conn = sqlite3.connect(self.db_path)
+        
+        query = """
+            SELECT timestamp, confirmed_balance 
+            FROM whale_balance_history 
+            WHERE address = ? 
+            ORDER BY timestamp ASC
+        """
+        
+        df = pd.read_sql_query(query, conn, params=(address,))
+        conn.close()
+
+        if df.empty or len(df) < 2:
+            return f"No enough data for {address}"
+
+        # Convert timestamp to pandas datetime
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+        # Calculate trend: Compare first and last recorded balance
+        first_balance = df["confirmed_balance"].iloc[0]
+        last_balance = df["confirmed_balance"].iloc[-1]
+
+        if last_balance > first_balance:
+            return f"✅ Whale {address} is ACCUMULATING ({first_balance} BTC → {last_balance} BTC)"
+        elif last_balance < first_balance:
+            return f"🚨 Whale {address} is DISTRIBUTING ({first_balance} BTC → {last_balance} BTC)"
+        else:
+            return f"⚖️ Whale {address} has NO SIGNIFICANT CHANGE ({first_balance} BTC)"
         
     
-    def track_wallet_balance(self, address):
-        balance = self.fetch_balances(address)
-        if balance is None:
-            return
-
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Check if address already exists
-        cursor.execute("SELECT last_balance FROM whale_wallets WHERE address = ?", (address,))
-        result = cursor.fetchone()
-
-        if result:
-            last_balance = result[0]
-            if balance != last_balance:
-                # Update latest balance
-                cursor.execute("UPDATE whale_wallets SET last_balance = ?, last_checked = ? WHERE address = ?",
-                            (balance, datetime.now(), address))
-                # Store historical record
-                cursor.execute("INSERT INTO whale_wallet_history (address, balance) VALUES (?, ?)", (address, balance))
-        else:
-            # Insert new whale wallet
-            cursor.execute("INSERT INTO whale_wallets (address, last_balance) VALUES (?, ?)", (address, balance))
-            cursor.execute("INSERT INTO whale_wallet_history (address, balance) VALUES (?, ?)", (address, balance))
-
-        conn.commit()
-        conn.close()
-    
+    def track_whale_balances(self, addresses):
+        """Fetch and store balances for multiple whales"""
+        for address in addresses:
+            balance = self.fetch_balance(address)
+            if balance:
+                self.store_balance_history(address, balance["confirmed"], balance["unconfirmed"])
+  
 
     def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
@@ -180,3 +208,45 @@ class WhaleTracking():
             self.process_tx_batch(mempool_txids[i:i+batch_size], threshold, self.db_path, btc_price)
 
         return True
+    
+
+    def get_whale_addresses(self, min_tx_count=3):
+        """
+        Extract whale addresses based on transaction frequency.
+        min_tx_count: Number of times an address should appear in whale transactions.
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        # Fetch whale transactions from the database
+        df = pd.read_sql_query("SELECT tx_in_addr, tx_out_addr FROM mempool_transactions", conn)
+        conn.close()
+
+        all_addresses = []
+
+        # Extract all input and output addresses
+        for col in ["tx_in_addr", "tx_out_addr"]:
+            df[col] = df[col].apply(lambda x: eval(x) if isinstance(x, str) else [])  # Convert string to list
+            for addr_list in df[col]:
+                all_addresses.extend(addr_list)
+
+        # Count occurrences of each address
+        address_counts = pd.Series(all_addresses).value_counts()
+
+        # Filter addresses that appear at least 'min_tx_count' times
+        whale_addresses = address_counts[address_counts >= min_tx_count].index.tolist()
+        
+        return whale_addresses
+
+
+    def merge_with_clusters(self, whale_addresses, clustered_addresses):
+        """
+        Merge whale addresses with clustered addresses.
+        This helps track addresses that interact frequently.
+        """
+        expanded_whale_addresses = set(whale_addresses)
+
+        for cluster in clustered_addresses:
+            if any(addr in expanded_whale_addresses for addr in cluster):
+                expanded_whale_addresses.update(cluster)
+
+        return list(expanded_whale_addresses)

@@ -1,8 +1,5 @@
-import hashlib
-import codecs
-import bech32
+import bitcoinlib
 import requests
-import base58
 import sqlite3
 from datetime import datetime, timedelta
 import json
@@ -104,26 +101,5 @@ def fetch_btc_price() -> float:
         print(f"Error fetching BTC price: {response.status_code}")
         return None
 
-
 def address_to_scripthash(address):
-    """Convert Bitcoin address to Electrum's scripthash format"""
-    try:
-        if address.startswith("1"):  # P2PKH Address
-            decoded = base58.b58decode_check(address).hex()
-            script = f"76a914{decoded[2:]}88ac"
-        elif address.startswith("3"):  # P2SH Address
-            decoded = base58.b58decode_check(address).hex()
-            script = f"a914{decoded[2:]}87"
-        elif address.startswith("bc1"):  # Bech32 SegWit Address
-            hrp, data = bech32.bech32_decode(address)
-            if not data:
-                raise ValueError("Invalid Bech32 address")
-            script = codecs.encode(hashlib.sha256(bytes(bech32.convertbits(data[1:], 5, 8, False))).digest(), 'hex').decode()
-        else:
-            raise ValueError(f"Unsupported address type: {address}")
-
-        scripthash = hashlib.sha256(bytes.fromhex(script)).digest()[::-1].hex()
-        return scripthash
-    except Exception as e:
-        print(f"❌ Address conversion error: {e}")
-        return None
+    return bitcoinlib.keys.deserialize_address(address)["public_key_hash"]
