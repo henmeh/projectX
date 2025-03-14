@@ -2,7 +2,6 @@
 1. Tracking all mempool transactions that sending more than 10 btc. Tracking is done every minute
 2. Tracking feerates every 60 seconds
 """
-
 import time
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
