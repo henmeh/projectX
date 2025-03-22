@@ -7,7 +7,6 @@ sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, address_to_scripthash
 from Mempool.mempool import Mempool
 from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
-from datetime import datetime
 from NodeConnect.node_connect import NodeConnect
 from .whale_alert import WhaleAlerts
 
@@ -80,18 +79,34 @@ class WhaleTracking():
   
     
     def fetch_balance(self, address: str) -> dict:
-        """Fetch the balance of a single address"""
-        scripthash = address_to_scripthash(address)
-        if not scripthash:
-            return None
-              
-        balance = self.node.electrum_request("blockchain.scripthash.get_balance", [scripthash])
-        if balance:
-            confirmed = balance.get("confirmed", 0) / 1e8  # Convert satoshis to BTC
-            unconfirmed = balance.get("unconfirmed", 0) / 1e8
-            return {"confirmed": confirmed, "unconfirmed": unconfirmed}
-        return None
+        from bitcoinrpc.authproxy import AuthServiceProxy
 
+        self.rpc_user = RPC_USER
+        self.rpc_password = RPC_PASSWORD
+        self.rpc_host = RPC_HOST
+        try:
+            self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
+            print("✅ RPC Connection Established!")
+        except Exception as e:
+            print(f"❌ RPC Connection Failed: {e}")
+            self.rpc = None
+
+        """Fetch the balance of a single address"""
+        print(f"Fetching balance for address: {address}")
+        
+        addresses = ["bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln", "bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln", "bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln"]
+        # Convert the address to a descriptor
+        descriptor = [f"addr({address})" for address in addresses]
+        
+        # Call the Bitcoin Core API with the descriptor
+        try:
+            batch = [["scantxoutset", "start", [f"addr({address})" for address in addresses]]]
+            balance = self.rpc.batch_(batch)
+            return balance
+        except Exception as e:
+            print(f"Error fetching balance: {e}")
+            return None
+        
 
     def fetch_balances(self, addresses: list) -> list:
         """Fetch balances for multiple addresses"""
@@ -136,11 +151,21 @@ class WhaleTracking():
         
     
     def track_whale_balances(self, addresses):
+        print("Hallo von track_whale_balances")
         """Fetch and store balances for multiple whales"""
-        for address in addresses:
-            balance = self.fetch_balance(address)
-            if balance:
-                self.store_balance_history(address, balance["confirmed"], balance["unconfirmed"])
+        # Format the addresses into the required descriptor format
+        print(addresses)
+        balances = self.fetch_balance(addresses)
+        print(balances)
+        return balances
+
+
+
+        #for address in addresses:
+        #    balance = self.fetch_balance(address)
+        #    print(balance)
+        #    #if balance:
+        #    #    self.store_balance_history(address, balance["confirmed"], balance["unconfirmed"])
   
 
     def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
