@@ -4,9 +4,9 @@ from collections import Counter
 import pandas as pd
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, address_to_scripthash
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
 from Mempool.mempool import Mempool
-from node_data import RPC_USER, RPC_PASSWORD, RPC_HOST
+from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI
 from NodeConnect.node_connect import NodeConnect
 from .whale_alert import WhaleAlerts
 
@@ -15,14 +15,9 @@ class WhaleTracking():
     def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
         self.db_path = db_path
         self.days = days
-        self.rpc_user = RPC_USER
-        self.rpc_password = RPC_PASSWORD
-        self.rpc_host = RPC_HOST
         self.mempool = Mempool()
         self.whale_alert = WhaleAlerts()
         try:
-            #create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallets (address TEXT PRIMARY KEY, last_balance REAL, last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
-            #create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_wallet_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT, balance REAL, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (address) REFERENCES whale_wallets(address))""")
             create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_balance_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, confirmed_balance REAL NOT NULL, unconfirmed_balance REAL NOT NULL)""")
         except Exception as e:
             print(f"❌ Database creation filed: {e}")
@@ -31,7 +26,7 @@ class WhaleTracking():
         except Exception as e:
             print(f"❌ RPC Connection Failed: {e}")
             self.whale_transactions = []
-        self.node = NodeConnect()
+        self.node_raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI)
 
 
     def whale_behavior_patterns(self) -> list:
@@ -81,9 +76,9 @@ class WhaleTracking():
     def fetch_balance(self, address: str) -> dict:
         from bitcoinrpc.authproxy import AuthServiceProxy
 
-        self.rpc_user = RPC_USER
-        self.rpc_password = RPC_PASSWORD
-        self.rpc_host = RPC_HOST
+        self.rpc_user = RPC_USER_RASPI
+        self.rpc_password = RPC_PASSWORD_RASPI
+        self.rpc_host = RPC_HOST_RASPI
         try:
             self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
             print("✅ RPC Connection Established!")
@@ -170,7 +165,7 @@ class WhaleTracking():
 
     def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
-        tx_data = self.node.rpc_batch_call("getrawtransaction", txids)
+        tx_data = self.node_raspi.rpc_batch_call("getrawtransaction", txids)
         whale_tx = []
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
@@ -179,7 +174,7 @@ class WhaleTracking():
                 vin_tx_addr = []
                 vout_tx_addr = []
                 for vin in tx["vin"]:
-                    vin_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
+                    vin_tx = self.node_raspi.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
                     vin_out = vin_tx["vout"][vin["vout"]]
                     sum_btc_input += float(vin_out["value"])
                     fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000

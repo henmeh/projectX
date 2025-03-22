@@ -3,10 +3,12 @@ import json
 import socket
 import requests
 import sys
+sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+from node_data import ELECTRUM_HOST, ELECTRUM_PORT
 
 class NodeConnect():
 
-    def __init__(self, electrum_host, electrum_port, rpc_user, rpc_password, rpc_host):
+    def __init__(self, rpc_user, rpc_password, rpc_host, electrum_host=ELECTRUM_HOST, electrum_port=ELECTRUM_PORT):
         self.electrum_host = electrum_host
         self.electrum_port = electrum_port
         self.rpc_user = rpc_user

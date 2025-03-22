@@ -4,13 +4,14 @@ import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import create_table, store_data, fetch_data
+from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI
 from NodeConnect.node_connect import NodeConnect
 
 class Mempool():
 
     def __init__(self):
         self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
-        self.node = NodeConnect()
+        self.node_raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI)
 
 
     def get_mempool_feerates(self, block_vsize_limit:int=1000000) -> json:
@@ -140,9 +141,9 @@ class Mempool():
     def get_mempool_txids(self)-> list:
         """Fetches transaction IDs from the mempool."""
         try:
-            response = self.node.rpc_call("getrawmempool")
+            response = self.node_raspi.rpc_call("getrawmempool")
             mempool_transaction_ids = list(response["result"])
-            return mempool_transaction_ids 
+            return mempool_transaction_ids
         except Exception as e:
             print(f"Error fetching mempool txids: {e}")
             return []
