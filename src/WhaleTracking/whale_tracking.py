@@ -6,17 +6,13 @@ import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
 from Mempool.mempool import Mempool
-from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI
-from NodeConnect.node_connect import NodeConnect
 from .whale_alert import WhaleAlerts
 
 class WhaleTracking():
 
-    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
+    def __init__(self, node, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
         self.db_path = db_path
         self.days = days
-        self.mempool = Mempool()
-        self.whale_alert = WhaleAlerts()
         try:
             create_table(self.db_path, """CREATE TABLE IF NOT EXISTS whale_balance_history (id INTEGER PRIMARY KEY AUTOINCREMENT, address TEXT NOT NULL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, confirmed_balance REAL NOT NULL, unconfirmed_balance REAL NOT NULL)""")
         except Exception as e:
@@ -26,7 +22,7 @@ class WhaleTracking():
         except Exception as e:
             print(f"❌ RPC Connection Failed: {e}")
             self.whale_transactions = []
-        self.node_raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI)
+        self.node = node
 
 
     def whale_behavior_patterns(self) -> list:
@@ -73,30 +69,10 @@ class WhaleTracking():
         return top_senders, top_receivers, recurring_addresses, whale_activity_by_hour
   
     
-    def fetch_balance(self, address: str) -> dict:
-        from bitcoinrpc.authproxy import AuthServiceProxy
-
-        self.rpc_user = RPC_USER_RASPI
-        self.rpc_password = RPC_PASSWORD_RASPI
-        self.rpc_host = RPC_HOST_RASPI
-        try:
-            self.rpc = AuthServiceProxy(f"http://{self.rpc_user}:{self.rpc_password}@{self.rpc_host}", timeout=180)
-            print("✅ RPC Connection Established!")
-        except Exception as e:
-            print(f"❌ RPC Connection Failed: {e}")
-            self.rpc = None
-
-        """Fetch the balance of a single address"""
-        print(f"Fetching balance for address: {address}")
-        
-        addresses = ["bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln", "bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln", "bc1qkh4xr4x8hjra8wymcnyvzzxu6alxeerwkrufln"]
-        # Convert the address to a descriptor
-        descriptor = [f"addr({address})" for address in addresses]
-        
-        # Call the Bitcoin Core API with the descriptor
+    def fetch_balance(self, addresses: list) -> dict:
         try:
             batch = [["scantxoutset", "start", [f"addr({address})" for address in addresses]]]
-            balance = self.rpc.batch_(batch)
+            balance = self.node.batch_call(batch)
             return balance
         except Exception as e:
             print(f"Error fetching balance: {e}")
@@ -165,7 +141,8 @@ class WhaleTracking():
 
     def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
-        tx_data = self.node_raspi.rpc_batch_call("getrawtransaction", txids)
+        whale_alert = WhaleAlerts()
+        tx_data = self.node.rpc_batch_call("getrawtransaction", txids)
         whale_tx = []
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
@@ -173,19 +150,29 @@ class WhaleTracking():
             if sum_btc_sent > threshold:
                 vin_tx_addr = []
                 vout_tx_addr = []
-                for vin in tx["vin"]:
-                    vin_tx = self.node_raspi.rpc_call("getrawtransaction", [vin["txid"], True])["result"]
-                    vin_out = vin_tx["vout"][vin["vout"]]
-                    sum_btc_input += float(vin_out["value"])
-                    fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
-                    fee_per_vbyte = fee_paid / tx["vsize"]
 
-                    vin_tx_addr.append(vin_tx["vout"][vin["vout"]]["scriptPubKey"]["address"])
+                #for the input transactions the txid and the vout needs to be saved
+                vin_txs_data_to_store = {}
+                
+                for vin in tx["vin"]:
+                    vin_txs_data_to_store[vin["txid"]] = vin["vout"]
                 
                 for vout in tx["vout"]:
-                    if "address" in vout["scriptPubKey"]:
+                    if "address" in vout:
+                        vout_tx_addr.append(vout["address"])
+                    else:
                         vout_tx_addr.append(vout["scriptPubKey"]["address"])
-                
+
+                vin_txs = self.node.rpc_batch_call("getrawtransaction", list(vin_txs_data_to_store.keys()))
+
+                for vin_tx in vin_txs:
+                    vin_out = vin_tx["vout"][vin_txs_data_to_store[vin_tx["txid"]]]
+                    vin_tx_addr.append(vin_tx["vout"][vin_txs_data_to_store[vin_tx["txid"]]]["scriptPubKey"]["address"])
+                    sum_btc_input += float(vin_out["value"])
+                              
+                fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
+                fee_per_vbyte = fee_paid / tx["vsize"]
+                                
                 whale_tx.append({
                     "txid": tx["txid"],
                     "size": tx["size"],
@@ -198,8 +185,8 @@ class WhaleTracking():
                     "total_sent": float(sum_btc_sent)
                 })
 
-                if sum_btc_sent >= self.whale_alert.get_alert_threshold():
-                    self.whale_alert.detect_unusual_activity({"sum_btc_sent": sum_btc_sent, "tx_in_addr": vin_tx_addr, "tx_out_addr": vout_tx_addr, "txid": tx["txid"]})
+                if sum_btc_sent >= whale_alert.get_alert_threshold():
+                    whale_alert.detect_unusual_activity({"sum_btc_sent": sum_btc_sent, "tx_in_addr": vin_tx_addr, "tx_out_addr": vout_tx_addr, "txid": tx["txid"]})
 
         for tx in whale_tx:
             store_data(db_path, "INSERT INTO mempool_transactions (txid, size, vsize, weight, tx_in_addr, tx_out_addr, fee_paid, fee_per_vbyte, total_sent, btcusd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (tx["txid"], tx["size"], tx["vsize"], tx["weight"], tx["tx_in_addr"], tx["tx_out_addr"], tx["fee_paid"], tx["fee_per_vbyte"], tx["total_sent"], btc_price))
@@ -207,7 +194,9 @@ class WhaleTracking():
 
     def get_whale_transactions(self, threshold: int=100, batch_size=25)-> list:
         """Fetches transactions from the mempool that are above the threshold."""
-        mempool_txids = self.mempool.get_mempool_txids()
+        mempool = Mempool(self.node)
+
+        mempool_txids = mempool.get_mempool_txids()
         btc_price = fetch_btc_price()
         
         create_table(self.db_path, '''CREATE TABLE IF NOT EXISTS mempool_transactions (
