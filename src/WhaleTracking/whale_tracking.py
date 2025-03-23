@@ -4,7 +4,7 @@ from collections import Counter
 import pandas as pd
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, get_existing_txids
 from Mempool.mempool import Mempool
 from .whale_alert import WhaleAlerts
 
@@ -142,7 +142,13 @@ class WhaleTracking():
     def process_tx_batch(self, txids: list, threshold: int, db_path: str, btc_price: float) -> None:
         """Processes a batch of transactions and stores results in the database."""
         whale_alert = WhaleAlerts()
-        tx_data = self.node.rpc_batch_call("getrawtransaction", txids)
+        existing_txids = get_existing_txids(db_path, txids)
+        new_txids = [txid for txid in txids if txid not in existing_txids]
+    
+        if not new_txids:
+            return
+        
+        tx_data = self.node.rpc_batch_call("getrawtransaction", new_txids)
         whale_tx = []
         for tx in tx_data:
             sum_btc_sent = sum([out["value"] for out in tx["vout"]])
@@ -169,7 +175,7 @@ class WhaleTracking():
                     vin_out = vin_tx["vout"][vin_txs_data_to_store[vin_tx["txid"]]]
                     vin_tx_addr.append(vin_tx["vout"][vin_txs_data_to_store[vin_tx["txid"]]]["scriptPubKey"]["address"])
                     sum_btc_input += float(vin_out["value"])
-                              
+
                 fee_paid = (float(sum_btc_input) - float(sum_btc_sent)) * 100000000
                 fee_per_vbyte = fee_paid / tx["vsize"]
                                 

@@ -37,6 +37,22 @@ def fetch_data(path_to_db:str, sql_command:str) -> list:
     return rows
 
 
+def get_existing_txids(path_to_db: str, txids: list) -> set:
+    """Fetch existing txids from the database to avoid duplicate processing."""
+    query = f"SELECT txid FROM mempool_transactions WHERE txid IN ({','.join(['?']*len(txids))})"
+    
+    try:
+        conn = sqlite3.connect(path_to_db)
+        cursor = conn.cursor()
+        cursor.execute(query, txids)
+        existing_txids = {row[0] for row in cursor.fetchall()}
+        conn.close()
+        return existing_txids
+    except Exception as e:
+        print(f"Database Error: {e}")
+        return set()
+
+
 def fetch_whale_transactions(db_mempool_transactions_path: str, days: int) -> list:
         """
         Fetches whale transactions from the last `days` days.
