@@ -10,7 +10,7 @@ from .whale_alert import WhaleAlerts
 
 class WhaleTracking():
 
-    def __init__(self, node, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
+    def __init__(self, node = None, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days=7):
         self.db_path = db_path
         self.days = days
         try:
@@ -166,8 +166,13 @@ class WhaleTracking():
                 for vout in tx["vout"]:
                     if "address" in vout:
                         vout_tx_addr.append(vout["address"])
+                    if "scriptPubKey" in vout:
+                        if "address" in vout["scriptPubKey"]:
+                            vout_tx_addr.append(vout["scriptPubKey"]["address"])
+                        else:
+                            vout_tx_addr.append("")
                     else:
-                        vout_tx_addr.append(vout["scriptPubKey"]["address"])
+                        vout_tx_addr.append("")
 
                 vin_txs = self.node.rpc_batch_call("getrawtransaction", list(vin_txs_data_to_store.keys()))
 

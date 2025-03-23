@@ -10,7 +10,7 @@ from WhaleTracking.whale_tracking import WhaleTracking
 
 
 if __name__ == "__main__":
-        whale_tracking =WhaleTracking()
+        whale_tracking = WhaleTracking()
 
         create_table("/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", '''CREATE TABLE IF NOT EXISTS whale_analysis (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,

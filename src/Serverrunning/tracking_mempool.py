@@ -8,13 +8,13 @@ sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Mempool.mempool import Mempool
 from WhaleTracking.whale_tracking import WhaleTracking
 from NodeConnect.node_connect import NodeConnect
-from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI
+from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI, RPC_USER_LOCAL, RPC_PASSWORD_LOCAL, RPC_HOST_LOCAL
 
 
 
 if __name__ == "__main__":
         raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI).get_node()
-        whaletracking = WhaleTracking(raspi)
+        whaletracking = WhaleTracking(node=raspi)
         mempool = Mempool(raspi)
         
         while True:
