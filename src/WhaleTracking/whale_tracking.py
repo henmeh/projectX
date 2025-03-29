@@ -4,7 +4,7 @@ from collections import Counter
 import pandas as pd
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, get_existing_txids
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions, get_existing_txids, fetch_data
 from Mempool.mempool import Mempool
 from .whale_alert import WhaleAlerts
 
@@ -72,7 +72,7 @@ class WhaleTracking():
     def fetch_balance(self, addresses: list) -> dict:
         try:
             batch = [["scantxoutset", "start", [f"addr({address})" for address in addresses]]]
-            balance = self.node.batch_call(batch)
+            balance = self.node.rpc_batch_call(batch)
             return balance
         except Exception as e:
             print(f"Error fetching balance: {e}")
@@ -230,34 +230,32 @@ class WhaleTracking():
         return True
     
 
-    def get_whale_addresses(self, min_tx_count=3):
+    def get_whale_addresses(self, min_tx_count=3, threshold=500):
+        """Fetches unique addresses from whale transactions and filters them."""
+        query = f"""
+        SELECT DISTINCT tx_in_addr FROM mempool_transactions WHERE total_sent >= {threshold} 
+        UNION 
+        SELECT DISTINCT tx_out_addr FROM mempool_transactions WHERE total_sent >= {threshold};
         """
-        Extract whale addresses based on transaction frequency.
-        min_tx_count: Number of times an address should appear in whale transactions.
-        """
-        conn = sqlite3.connect(self.db_path)
-        
-        # Fetch whale transactions from the database
-        df = pd.read_sql_query("SELECT tx_in_addr, tx_out_addr FROM mempool_transactions", conn)
-        conn.close()
+        raw_addresses = fetch_data(self.db_path, query)
 
-        all_addresses = []
+        # Flatten the list (since tx_in_addr and tx_out_addr are stored as JSON arrays)
+        unique_addresses = set()
+        for addr_list in raw_addresses:
+            addr_list = json.loads(addr_list[0])  # Convert JSON string to list
+            unique_addresses.update(addr_list)
 
-        # Extract all input and output addresses
-        for col in ["tx_in_addr", "tx_out_addr"]:
-            df[col] = df[col].apply(lambda x: eval(x) if isinstance(x, str) else [])  # Convert string to list
-            for addr_list in df[col]:
-                all_addresses.extend(addr_list)
+        # Filter addresses based on balance
+        whale_addresses = []
+        balance_data = self.fetch_balances(list(unique_addresses))
 
-        # Count occurrences of each address
-        address_counts = pd.Series(all_addresses).value_counts()
+        for addr, balance in balance_data.items():
+            if balance >= threshold:  # Consider it a whale if balance exceeds threshold
+                whale_addresses.append(addr)
 
-        # Filter addresses that appear at least 'min_tx_count' times
-        whale_addresses = address_counts[address_counts >= min_tx_count].index.tolist()
-        
         return whale_addresses
 
-
+    
     def merge_with_clusters(self, whale_addresses, clustered_addresses):
         """
         Merge whale addresses with clustered addresses.

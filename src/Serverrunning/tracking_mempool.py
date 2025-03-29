@@ -16,7 +16,6 @@ if __name__ == "__main__":
         raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI).get_node()
         whaletracking = WhaleTracking(node=raspi)
         mempool = Mempool(raspi)
-        
         while True:
             whaletracking.get_whale_transactions()
             mempool.get_mempool_feerates()
