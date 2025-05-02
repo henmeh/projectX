@@ -1,0 +1,2 @@
+2025-05-02 13:20:14,959 | ERROR | ❌ Failed to connect to the database: connection to server at "localhost" (127.0.0.1), port 5432 failed: fe_sendauth: no password supplied
+

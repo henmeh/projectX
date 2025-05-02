@@ -1,6 +1,7 @@
 import json
 import psycopg2
 from psycopg2.extras import execute_values
+from Helper.helperfunctions import fetch_historical_btc_price
 
 class BlockchainStoring:
 
@@ -14,9 +15,11 @@ class BlockchainStoring:
             "port": 5432,
         }
 
+
     def connect_db(self):
         """Establishes a connection to PostgreSQL."""
         return psycopg2.connect(**self.db_params)
+
 
     def process_block(self, block_height: int):
         """Processes a block and updates the database."""
@@ -29,6 +32,8 @@ class BlockchainStoring:
 
         tx_list = block_data["tx"]
         block_time = block_data["time"]
+
+        btc_price_usd = fetch_historical_btc_price(block_time)
 
         transactions = []
         utxos = []
@@ -48,14 +53,17 @@ class BlockchainStoring:
                 if "scriptPubKey" in vout and "addresses" in vout["scriptPubKey"]:
                     address = vout["scriptPubKey"]["addresses"][0]  # Extract address
                     value = int(vout["value"] * 100000000)  # Convert BTC to satoshis
-                    utxos.append((txid, vout["n"], address, value, block_height, False))
+                    utxos.append((txid, vout["n"], address, value, block_height, False, block_time, btc_price_usd))
                     address_changes[address] = address_changes.get(address, 0) + value
 
             # Store transaction details
-            transactions.append((txid, block_height, block_time, tx.get("fee", 0), tx["size"], tx["weight"], json.dumps(tx)))
+            transactions.append((txid, block_height, block_time, tx.get("fee", 0), tx["size"], tx["weight"], json.dumps(tx), btc_price_usd))
+
+        #self.delete_existing_block_data(block_height)
 
         self.store_data(transactions, utxos, spent_utxos, address_changes)
         print(f"Processed block {block_height} with {len(tx_list)} transactions.")
+
 
     def store_data(self, transactions, utxos, spent_utxos, address_changes):
         """Inserts data into PostgreSQL efficiently."""
@@ -64,14 +72,12 @@ class BlockchainStoring:
 
         # Insert Transactions
         if transactions:
-            execute_values(cursor, 
-                "INSERT INTO transactions (txid, block_height, timestamp, fee, size, weight, raw_tx) VALUES %s "
-                "ON CONFLICT (txid) DO NOTHING", transactions)
+            execute_values(cursor, "INSERT INTO transactions (txid, block_height, timestamp, fee, size, weight, raw_tx, btc_price_usd) VALUES %s "
+                                    "ON CONFLICT (txid) DO NOTHING", transactions)
 
         # Insert new UTXOs
         if utxos:
-            execute_values(cursor, 
-                "INSERT INTO utxos (txid, vout, address, value, block_height, spent) VALUES %s", utxos)
+            execute_values(cursor, "INSERT INTO utxos (txid, vout, address, value, block_height, spent, timestamp, btc_price_usd) VALUES %s", utxos)
 
         # Mark UTXOs as spent
         if spent_utxos:
@@ -88,6 +94,7 @@ class BlockchainStoring:
         conn.commit()
         cursor.close()
         conn.close()
+
 
     def sync_blocks(self, start_height: int, end_height: int = None):
         """Syncs blockchain data from start_height to latest block or a given end_height."""
@@ -106,6 +113,7 @@ class BlockchainStoring:
 
         print("Blockchain sync complete.")
 
+
     def get_address_balance(self, address: str):
         """Fetches the balance of a given address."""
         conn = self.connect_db()
@@ -114,3 +122,34 @@ class BlockchainStoring:
         result = cursor.fetchone()
         conn.close()
         return result[0] if result else 0
+
+
+    def get_latest_stored_block(self):
+        """Returns the latest block height stored in the transactions table."""
+        try:
+            conn = self.connect_db()
+            cursor = conn.cursor()
+            cursor.execute("SELECT MAX(block_height) FROM transactions;")
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            return result[0] if result and result[0] is not None else 0
+        except Exception as e:
+            print(f"Error fetching latest stored block: {e}")
+            return 0
+        
+
+    def delete_existing_block_data(self, block_height):
+        """Deletes all data related to a specific block height."""
+        conn = self.connect_db()
+        cursor = conn.cursor()
+
+        print(f"🧹 Deleting existing data for block {block_height}...")
+
+        # Delete transactions and related UTXOs (UTXOs first due to FK)
+        cursor.execute("DELETE FROM utxos WHERE block_height = %s", (block_height,))
+        cursor.execute("DELETE FROM transactions WHERE block_height = %s", (block_height,))
+
+        conn.commit()
+        cursor.close()
+        conn.close()

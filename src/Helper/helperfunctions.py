@@ -3,9 +3,10 @@ import requests
 import sqlite3
 from datetime import datetime, timedelta
 import json
+import time
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from node_data import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from node_data import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, COINCAP_API_KEY
 
 
 def create_table(path_to_db:str, sql_command:str):
@@ -119,3 +120,41 @@ def fetch_btc_price() -> float:
 
 def address_to_scripthash(address):
     return bitcoinlib.keys.deserialize_address(address)["public_key_hash"]
+
+
+def fetch_historical_btc_price(timestamp: int) -> float:
+    """
+    Fetch the historical BTC price in USD closest to the given UNIX timestamp using CoinCap API.
+    :param timestamp: UNIX timestamp in seconds
+    :return: BTC price in USD or None if not found
+    
+    url = f"https://api.coincap.io/v2/assets/bitcoin/history"
+    
+    # CoinCap requires timestamps in milliseconds
+    params = {
+        "interval": "m5",  # 5-minute intervals for more accuracy
+        "start": timestamp * 1000,
+        "end": (timestamp + 600) * 1000  # 10 minutes window
+    }
+
+    headers = {
+        "Authorization": f"Bearer {COINCAP_API_KEY}"
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+
+    if response.status_code == 200:
+        data = response.json()
+        if data["data"]:
+            # Return the closest price available
+            return float(data["data"][0]["priceUsd"])
+        else:
+            print("No historical data available for the given timestamp.")
+    else:
+        print(f"Failed to fetch historical BTC price. Status code: {response.status_code}")
+    """
+    return 0.0
+
+#timestamp = 1231006505  # UNIX timestamp for a block (e.g. block_time from blockchain)
+#price = fetch_historical_btc_price(timestamp)
+#print(f"BTC price at time {timestamp} was ${price}")
