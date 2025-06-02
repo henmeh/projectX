@@ -1,59 +1,83 @@
-import sqlite3
-import sys
-sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from Helper.helperfunctions import create_table, send_telegram_alert
 import datetime
+import hashlib
+from Helper.helperfunctions import create_table, send_telegram_alert, fetch_data, store_data
 
 class WhaleAlerts:
-    def __init__(self, db_path: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", alert_threshold=1000):
-        self.alert_threshold = alert_threshold
+    ALERT_TYPES = {
+        "WHALE_MOVE": 1000000,  # $1M USD
+        "MINER_BRIBE": 5000000,  # $5M USD
+        "EXCHANGE_FLOW": 2000000  # $2M USD
+    }
+    
+    def __init__(self, db_path: str):
         self.db_path = db_path
-        try:
-            create_table(self.db_path, """CREATE TABLE IF NOT EXISTS alerted_transactions (txid TEXT PRIMARY KEY, timestamp TEXT)""")
-        except Exception as e:
-            print(f"❌ Database creation filed: {e}")
-    
+        create_table(db_path, """CREATE TABLE IF NOT EXISTS alerted_events (
+            event_hash TEXT PRIMARY KEY,
+            timestamp DATETIME)""")
 
-    def get_alert_threshold(self) -> int:
-        """
-        Returns the threshold for the whale alert
-        """
-        return self.alert_threshold
-    
-    
-    def is_alerted(self, txid):
-        """Check if a transaction has already been alerted."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM alerted_transactions WHERE txid = ?", (txid,))
-            return cursor.fetchone() is not None
+    def get_alert_threshold(self, alert_type: str = "WHALE_MOVE") -> int:
+        return self.ALERT_TYPES.get(alert_type, 1000000)
 
+    def _generate_event_hash(self, event_data: dict) -> str:
+        """Create unique hash for alert events"""
+        hash_data = f"{event_data['txid']}-{event_data['sum_usd_sent']}"
+        return hashlib.sha256(hash_data.encode()).hexdigest()
 
-    def mark_as_alerted(self, txid, timestamp):
-        """Mark a transaction as alerted."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("INSERT OR IGNORE INTO alerted_transactions (txid, timestamp) VALUES (?, ?)", (txid, timestamp))
-            conn.commit()
-
+    def is_alerted(self, event_hash: str) -> bool:
+        """Check if event has been alerted"""
+        result = fetch_data(
+            self.db_path,
+            "SELECT 1 FROM alerted_events WHERE event_hash = ?",
+            (event_hash,)
+        )
+        return bool(result)
 
     def detect_unusual_activity(self, tx: dict):
-        """
-        Identify unusually large transactions and send alerts only once.
-        """
+        event_hash = self._generate_event_hash(tx)
         
-        # Skip if this transaction has already been alerted
-        if self.is_alerted(tx["txid"]) == False:
-                
-            message = (
-                        f"🚨 *Whale Alert!* 🚨\n"
-                        f"💰 *{tx['sum_btc_sent']} BTC* transferred!\n"
-                        f"📥 *From:* {', '.join(tx['tx_in_addr'][:3])}...\n"
-                        f"📤 *To:* {', '.join(tx['tx_out_addr'][:3])}...\n"
-                        f"⏳ *Time:* {datetime.datetime.now()}\n"
-                        f"🔗 [View Transaction](https://mempool.space/tx/{tx['txid']})"
-                    )
+        if self.is_alerted(event_hash):
+            return
+        
+        # Determine alert type
+        alert_type = "WHALE_MOVE"
+        if tx["fee_per_vbyte"] > 1000:  # Extremely high fee
+            alert_type = "MINER_BRIBE"
+        elif any("bc1q" in addr for addr in tx["tx_out_addr"]):  # Exchange pattern
+            alert_type = "EXCHANGE_FLOW"
+        
+        # Check if meets threshold
+        if tx["sum_usd_sent"] < self.get_alert_threshold(alert_type):
+            return
+        
+        # Send alert
+        self._send_alert(tx, alert_type)
+        self._mark_as_alerted(event_hash)
 
-            # Send alert and mark it as alerted
-            send_telegram_alert(message)
-            self.mark_as_alerted(tx["txid"], datetime.datetime.now())
+    def _send_alert(self, tx: dict, alert_type: str):
+        """Send multi-channel alerts"""
+        message = self._format_alert(tx, alert_type)
+        
+        # Primary channel
+        send_telegram_alert(message)
+
+
+    def _format_alert(self, tx: dict, alert_type: str) -> str:
+        """Create formatted alert message"""
+        emoji = "🐳" if alert_type == "WHALE_MOVE" else "⛏️" if alert_type == "MINER_BRIBE" else "🏦"
+        return (
+            f"{emoji} *{alert_type.replace('_', ' ').title()} Alert!* {emoji}\n"
+            f"💰 *{tx['sum_btc_sent']:.2f} BTC* (${tx['sum_usd_sent']:,.2f})\n"
+            f"⛽ *Fee Rate:* {tx['fee_per_vbyte']:.1f} sat/vB\n"
+            f"📥 *From:* {', '.join(tx['tx_in_addr'][:2])}...\n"
+            f"📤 *To:* {', '.join(tx['tx_out_addr'][:2])}...\n"
+            f"🕒 *Time:* {datetime.datetime.now():%Y-%m-%d %H:%M:%S}\n"
+            f"🔗 [View Transaction](https://mempool.space/tx/{tx['txid']})"
+        )
+
+    def _mark_as_alerted(self, event_hash: str):
+        """Mark event as alerted"""
+        store_data(
+            self.db_path,
+            "INSERT OR IGNORE INTO alerted_events (event_hash, timestamp) VALUES (?, CURRENT_TIMESTAMP)",
+            (event_hash,)
+        )

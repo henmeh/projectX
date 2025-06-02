@@ -10,7 +10,7 @@ class BlockchainStoring:
         self.db_params = {
             "dbname": "bitcoin_blockchain",
             "user": "postgres",
-            "password": "henning",  # Replace with your PostgreSQL password
+            "password": "projectX",
             "host": "localhost",
             "port": 5432,
         }
@@ -18,7 +18,13 @@ class BlockchainStoring:
 
     def connect_db(self):
         """Establishes a connection to PostgreSQL."""
-        return psycopg2.connect(**self.db_params)
+        conn = psycopg2.connect(**self.db_params)
+        cursor = conn.cursor()
+        cursor.execute("SET max_stack_depth = '7680kB';")  # Double the default
+        conn.commit()
+        cursor.close()
+        return conn
+        #return psycopg2.connect(**self.db_params)
 
 
     def process_block(self, block_height: int):
@@ -129,11 +135,16 @@ class BlockchainStoring:
         try:
             conn = self.connect_db()
             cursor = conn.cursor()
-            cursor.execute("SELECT MAX(block_height) FROM transactions;")
+            # Use ORDER BY + LIMIT which can use indexes more efficiently
+            cursor.execute("""
+                SELECT block_height FROM transactions 
+                ORDER BY block_height DESC 
+                LIMIT 1;
+            """)
             result = cursor.fetchone()
             cursor.close()
             conn.close()
-            return result[0] if result and result[0] is not None else 0
+            return result[0] if result else 0
         except Exception as e:
             print(f"Error fetching latest stored block: {e}")
             return 0

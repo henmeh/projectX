@@ -1,111 +1,115 @@
 from collections import defaultdict
-import sys
-import json
-sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+import numpy as np
+from sklearn.cluster import DBSCAN
+from sklearn.feature_extraction.text import TfidfVectorizer
 from Helper.helperfunctions import fetch_whale_transactions, store_data, create_table
-import sqlite3
-
 
 class AddressClustering:
-    def __init__(self, path_to_db: str = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db", days: int = 7):
-        self.path_to_db = path_to_db
+    def __init__(self, db_path: str, days: int = 7):
+        self.db_path = db_path
         self.days = days
-        self.address_clusters = []  # List of address clusters
+        self.graph = defaultdict(set)
+        self.address_embeddings = {}
         
-        try:
-            self.whale_transactions = fetch_whale_transactions(self.path_to_db, self.days)
-        except Exception as e:
-            print(f"❌ RPC Connection Failed: {e}")
-            self.whale_transactions = []
+        create_table(db_path, '''CREATE TABLE IF NOT EXISTS address_clusters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cluster_id INTEGER,
+            address TEXT,
+            embedding BLOB)''')
+        
+        create_table(db_path, '''CREATE TABLE IF NOT EXISTS cluster_relationships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            address_a TEXT,
+            address_b TEXT,
+            relationship_score REAL)''')
 
-
-    def _generate_clusters(self, transactions):
-        """
-        Generates clusters of addresses that frequently interact with each other
-        """
-        related_addresses = defaultdict(set)  # Dictionary that tracks relationships between addresses
-
-        # Iterate through each transaction
+    def _generate_embeddings(self, transactions):
+        """Generate AI embeddings for addresses based on transaction patterns"""
+        # Create transaction "documents" for each address
+        addr_docs = defaultdict(list)
         for tx in transactions:
-            # For each transaction, we'll add input and output addresses to each other's related set
-            for input_addr in tx["tx_in_addr"]:
-                for output_addr in tx["tx_out_addr"]:
-                    related_addresses[input_addr].add(output_addr)
-                    related_addresses[output_addr].add(input_addr)
+            for addr in tx["tx_in_addr"]:
+                addr_docs[addr].extend(tx["tx_out_addr"])
+            for addr in tx["tx_out_addr"]:
+                addr_docs[addr].extend(tx["tx_in_addr"])
+        
+        # Convert to string representations
+        addr_docs = {addr: " ".join(set(docs)) for addr, docs in addr_docs.items()}
+        
+        # Generate TF-IDF embeddings
+        vectorizer = TfidfVectorizer()
+        embeddings = vectorizer.fit_transform(list(addr_docs.values()))
+        
+        # Store embeddings
+        self.address_embeddings = {
+            addr: embeddings[i].toarray()[0] 
+            for i, addr in enumerate(addr_docs.keys())
+        }
 
-        # Now, we can cluster addresses based on their interaction
-        visited = set()  # To keep track of already visited addresses
-        for address in related_addresses:
-            if address not in visited:
-                # Start a new cluster from this address
-                cluster = self._expand_cluster(address, related_addresses, visited)
-                if cluster:
-                    self.address_clusters.append(cluster)
-
-
-    def _expand_cluster(self, address, related_addresses, visited):
-        """
-        Expands a cluster by recursively adding addresses that are related to the given address.
-        """
-        cluster = []
-        addresses_to_visit = [address]
-
-        while addresses_to_visit:
-            current_address = addresses_to_visit.pop()
-            if current_address not in visited:
-                visited.add(current_address)
-                cluster.append(current_address)
-                # Add related addresses to visit next
-                addresses_to_visit.extend(related_addresses[current_address] - visited)
-
-        # Return the cluster only if it has meaningful connections
-        return cluster if len(cluster) > 1 else None  # At least two addresses interacting
-
-
-    def get_clusters(self):
-        """
-        Retrieves the list of clusters
-        """
-        return self.address_clusters
-
+    def _cluster_with_ai(self):
+        """Cluster addresses using embedding similarity"""
+        if not self.address_embeddings:
+            return []
+        
+        addresses = list(self.address_embeddings.keys())
+        embeddings = np.array([self.address_embeddings[addr] for addr in addresses])
+        
+        # DBSCAN clustering
+        clustering = DBSCAN(eps=0.5, min_samples=2).fit(embeddings)
+        labels = clustering.labels_
+        
+        # Group addresses by cluster
+        clusters = defaultdict(list)
+        for addr, label in zip(addresses, labels):
+            if label != -1:  # Ignore noise
+                clusters[label].append(addr)
+        
+        return list(clusters.values())
 
     def run_clustering(self):
-        """
-        Run clustering analysis and get the resulting clusters
-        """
-        self._generate_clusters(self.whale_transactions)
-        return self.get_clusters()
-
-
-    def store_clusters(self, clusters):
-        """Stores address cluster in db"""
-        try:
-            create_table(self.path_to_db, '''CREATE TABLE IF NOT EXISTS address_clusters (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        clusters TEXT)''')
+        """Run AI-enhanced clustering"""
+        whale_transactions = fetch_whale_transactions(self.db_path, self.days)
         
-            for cluster in clusters:
-                store_data(self.path_to_db, "INSERT INTO address_clusters (clusters) VALUES (?)", (json.dumps(cluster),))
-           
-        except Exception as e:
-            print(f"❌ Error saving clusters to database: {e}")
-    
-
-    def fetch_clusters(self):
-        try:
-            conn = sqlite3.connect(self.path_to_db)
-            cursor = conn.cursor()
-
-            # Fetch all clusters from the table
-            cursor.execute("SELECT clusters FROM address_clusters")
-            rows = cursor.fetchall()
-
-            # Convert the JSON string back to lists
-            clusters = [json.loads(row[0]) for row in rows]
-
-            conn.close()
-            return clusters
-
-        except Exception as e:
-            print(f"❌ Error fetching clusters: {e}")
+        if not whale_transactions:
             return []
+        
+        self._generate_embeddings(whale_transactions)
+        ai_clusters = self._cluster_with_ai()
+        traditional_clusters = self._generate_clusters(whale_transactions)
+        
+        # Combine results
+        all_clusters = traditional_clusters + ai_clusters
+        merged_clusters = self._merge_clusters(all_clusters)
+        
+        self.store_clusters(merged_clusters)
+        return merged_clusters
+
+    def _merge_clusters(self, clusters):
+        """Merge overlapping clusters"""
+        # Implement graph-based merging
+        cluster_graph = {}
+        for i, cluster in enumerate(clusters):
+            for addr in cluster:
+                if addr not in cluster_graph:
+                    cluster_graph[addr] = set()
+                cluster_graph[addr].add(i)
+        
+        # Merge clusters with common addresses
+        merged = []
+        visited = set()
+        for i in range(len(clusters)):
+            if i in visited:
+                continue
+            current = set(clusters[i])
+            queue = [j for addr in clusters[i] for j in cluster_graph[addr] if j != i]
+            while queue:
+                j = queue.pop()
+                if j in visited:
+                    continue
+                visited.add(j)
+                current.update(clusters[j])
+                # Add new neighbors
+                queue.extend(k for addr in clusters[j] for k in cluster_graph[addr] if k not in visited)
+            merged.append(list(current))
+        
+        return merged

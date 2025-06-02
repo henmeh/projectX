@@ -1,148 +1,170 @@
-import socket
-import matplotlib.pyplot as plt
-import json
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+import json
+import time
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from Helper.helperfunctions import create_table, store_data, fetch_data
+from datetime import datetime
 
-class Mempool():
-
-    def __init__(self, node):
-        self.db_mempool_transactions_path = "/media/henning/Volume/Programming/projectX/src/mempool_transactions.db"
+class Mempool:
+    def __init__(self, node, db_path: str):
+        #if not isinstance(node, Node):
+        #    raise ValueError("node must be an instance of Node or its subclass")
+            
         self.node = node
+        self.db_path = db_path
+        self.last_fetch_time = 0
+        self.fee_cache = None
+        self.cache_duration = 60
+        
+        # Initialize database tables
+        create_table(db_path, '''CREATE TABLE IF NOT EXISTS mempool_fee_histogram (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            histogram TEXT,
+            fast_fee REAL,
+            medium_fee REAL,
+            low_fee REAL)''')
+        
+        create_table(db_path, '''CREATE TABLE IF NOT EXISTS fee_predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            prediction_time INTEGER,
+            fast_fee_pred REAL,
+            medium_fee_pred REAL,
+            low_fee_pred REAL)''')
 
-
-    def get_mempool_feerates(self, block_vsize_limit:int=1000000) -> json:
-        """Fetching Feerates from local mempool"""
-        request_data = {
-            "id": 0,
-            "method": "mempool.get_fee_histogram",
-            "params": []
-        }
+    def get_mempool_feerates(self, block_vsize_limit: int = 1_000_000) -> dict:
+        current_time = time.time()
+        if self.fee_cache and (current_time - self.last_fetch_time) < self.cache_duration:
+            return self.fee_cache
+        
         try:
-            with socket.create_connection((self.node.get_node_data()["electrum_host"], self.node.get_node_data()["electrum_port"])) as sock:
-                sock.sendall(json.dumps(request_data).encode() + b'\n')
-                response = sock.recv(4096).decode()
-                fee_histogram = json.loads(response)["result"]
-                
-                create_table(self.db_mempool_transactions_path, '''CREATE TABLE IF NOT EXISTS mempool_fee_histogram (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        histogram TEXT,
-                        fast_fee REAL,
-                        medium_fee REAL,
-                        low_fee REAL)''')
-                
-                total_vsize = 0
-                vsize_25 = block_vsize_limit * 0.25  # Fast: Top 25%
-                vsize_50 = block_vsize_limit * 0.50  # Medium: Top 50%
-                vsize_75 = block_vsize_limit * 0.75  # Low: Top 75%
-
-                fast_fee = medium_fee = low_fee = None
-
-                # Sum transaction sizes and find percentiles
-                for fee_rate, vsize in fee_histogram:
-                    total_vsize += vsize
-
-                    if fast_fee is None and total_vsize >= vsize_25:
-                        fast_fee = fee_rate
-                    if medium_fee is None and total_vsize >= vsize_50:
-                        medium_fee = fee_rate
-                    if low_fee is None and total_vsize >= vsize_75:
-                        low_fee = fee_rate
-
-                    if total_vsize >= block_vsize_limit:
-                        break
-
-                store_data(self.db_mempool_transactions_path, "INSERT INTO mempool_fee_histogram (histogram, fast_fee, medium_fee, low_fee) VALUES (?, ?, ?, ?)", (json.dumps(fee_histogram), fast_fee, medium_fee, low_fee))
-                
+            # Get fee histogram from node implementation
+            fee_histogram = self.node.electrum_request("mempool.get_fee_histogram")["result"]
+            
+            if not fee_histogram:
+                raise ValueError("Empty fee histogram response")
+            
+            total_vsize = 0
+            percentiles = {
+                25: {"vsize": block_vsize_limit * 0.25, "fee": None},
+                50: {"vsize": block_vsize_limit * 0.50, "fee": None},
+                75: {"vsize": block_vsize_limit * 0.75, "fee": None}
+            }
+            
+            for fee_rate, vsize in fee_histogram:
+                total_vsize += vsize
+                for pct in percentiles:
+                    if not percentiles[pct]["fee"] and total_vsize >= percentiles[pct]["vsize"]:
+                        percentiles[pct]["fee"] = fee_rate
+                if total_vsize >= block_vsize_limit:
+                    break
+            
+            result = {
+                "fast": percentiles[25]["fee"],
+                "medium": percentiles[50]["fee"],
+                "low": percentiles[75]["fee"],
+                "histogram": fee_histogram
+            }
+            
+            self.fee_cache = result
+            self.last_fetch_time = current_time
+            
+            store_data(
+                self.db_path,
+                "INSERT INTO mempool_fee_histogram (histogram, fast_fee, medium_fee, low_fee) VALUES (?, ?, ?, ?)",
+                (json.dumps(fee_histogram), result["fast"], result["medium"], result["low"])
+            )
+            
+            return result
+        
+        except Exception:
+            # Fallback to last known data
+            last_data = fetch_data(
+                self.db_path,
+                "SELECT histogram, fast_fee, medium_fee, low_fee FROM mempool_fee_histogram ORDER BY timestamp DESC LIMIT 1"
+            )
+            if last_data:
                 return {
-                    "fast": fast_fee,
-                    "medium": medium_fee,
-                    "low": low_fee
-                }        
-        except Exception as e:
-            return f"Error: {str(e)}"
+                    "fast": last_data[0][2],
+                    "medium": last_data[0][3],
+                    "low": last_data[0][4],
+                    "histogram": json.loads(last_data[0][1])
+                }
+            return {"fast": 10, "medium": 5, "low": 1, "histogram": []}
+
     
-
-    def plot_fee_histogram_actual(self):
-        """Fetches and plots the mempool fee histogram."""
-        fee_histogram_actual = fetch_data(self.db_mempool_transactions_path, "SELECT histogram FROM mempool_fee_histogram ORDER BY timestamp DESC LIMIT 1")[0][0]
-        fee_histogram_actual_list = json.loads(fee_histogram_actual)
-        
-        # Extract fee rates and total vsize
-        fee_rates = [entry[0] for entry in fee_histogram_actual_list]
-        vsizes = [entry[1] for entry in fee_histogram_actual_list]
-
-        # Plot the histogram
-        plt.figure(figsize=(10, 6))
-        plt.bar(fee_rates, vsizes, width=1.5, color="blue", alpha=0.7)
-
-        plt.xlabel("Fee Rate (sats/vB)")
-        plt.ylabel("Total Vsize (vB)")
-        plt.title("Mempool Fee Rate Distribution")
-        plt.yscale("log")
-        plt.grid(True, which="both", linestyle="--", linewidth=0.5)
-        
-        plt.show()
-    
-
-    def get_mempool_stats(self) -> tuple:
-        """Fetches the mempool size and transaction count from Electrum server."""
+    def predict_fee_rates(self, time_horizon: int = 10) -> dict:
+        """Predict future fee rates using polynomial regression"""
         try:
-            result = self.node.electrum_request("mempool.get_fee_histogram")
-            if "result" in result:
-                fee_histogram = result["result"]
-                total_mempool_size = sum([fee[1] for fee in fee_histogram])
-                total_tx_count = len(fee_histogram)
+            # Fetch historical data
+            data = fetch_data(
+                self.db_path,
+                "SELECT timestamp, fast_fee, medium_fee, low_fee FROM mempool_fee_histogram "
+                "WHERE timestamp >= datetime('now', '-2 hours') ORDER BY timestamp ASC"
+            )
+            
+            if not data or len(data) < 5:
+                current = self.get_mempool_feerates()
+                return {
+                    "fast": current["fast"],
+                    "medium": current["medium"],
+                    "low": current["low"]
+                }
+            
+            # Prepare data arrays
+            timestamps = []
+            fast_fees = []
+            medium_fees = []
+            low_fees = []
+            
+            # Convert string timestamps to datetime objects
+            for row in data:
+                # SQLite returns timestamps as strings
+                timestamp_str = row[0]
+                # Handle different timestamp formats
+                if '.' in timestamp_str:
+                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+                else:
+                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamps.append(dt)
+                fast_fees.append(row[1])
+                medium_fees.append(row[2])
+                low_fees.append(row[3])
+            
+            # Convert to minutes since first timestamp
+            min_timestamp = min(timestamps)
+            minutes = [(ts - min_timestamp).total_seconds() / 60 for ts in timestamps]
+            
+            # Create polynomial features
+            poly = PolynomialFeatures(degree=2)
+            X = np.array(minutes).reshape(-1, 1)
+            X_poly = poly.fit_transform(X)
+            
+            # Train models and predict
+            predictions = {}
+            for fee_type, values in [("fast", fast_fees), ("medium", medium_fees), ("low", low_fees)]:
+                model = LinearRegression()
+                model.fit(X_poly, values)
                 
-                return total_mempool_size, total_tx_count
-            else:
-                print("Error: No result in response")
-                return None
-        except Exception as e:
-            print(f"Error fetching mempool stats: {e}")
-            return None
- 
-    
-    def get_transaction_fee(self, txid):
-        """Fetches the fee and fee rate of a transaction in the mempool."""
-        try:
-            tx = self.node.rpc_call("getrawtransaction", [txid, True])
-            if "error" in tx and tx["error"]:
-                print(f"Skipping {txid}: {tx['error']['message']}")
-                return None
-
-            vsize = tx["result"]["vsize"]
-
-            output_sum = sum([out["value"] for out in tx["result"]["vout"]]) * 1e8  
-
-            input_sum = 0
-            for vin in tx["result"]["vin"]:
-                if "txid" in vin and "vout" in vin:
-                    prev_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])
-                    if "error" in prev_tx and prev_tx["error"]:
-                        print(f"Skipping input {vin['txid']}: {prev_tx['error']['message']}")
-                        continue
-                    input_sum += prev_tx["result"]["vout"][vin["vout"]]["value"] * 1e8  
-
-            fee = input_sum - output_sum
-            fee_rate = fee / vsize if vsize > 0 else 0 
-
-            return {"txid": txid, "fee": fee, "fee_rate": fee_rate}
+                future_minute = minutes[-1] + time_horizon
+                future_poly = poly.transform([[future_minute]])
+                pred_value = model.predict(future_poly)[0]
+                predictions[fee_type] = max(1, round(pred_value, 2))
+            
+            # Store prediction
+            store_data(
+                self.db_path,
+                "INSERT INTO fee_predictions (prediction_time, fast_fee_pred, medium_fee_pred, low_fee_pred) VALUES (?, ?, ?, ?)",
+                (time_horizon, predictions["fast"], predictions["medium"], predictions["low"])
+            )
+            
+            return predictions
         
         except Exception as e:
-            print(f"Error fetching fee for {txid}: {e}")
-            return None
-       
-
-    def get_mempool_txids(self)-> list:
-        """Fetches transaction IDs from the mempool."""
-        try:
-            response = self.node.rpc_call("getrawmempool")
-            mempool_transaction_ids = list(response["result"])
-            return mempool_transaction_ids
-        except Exception as e:
-            print(f"Error fetching mempool txids: {e}")
-            return []
-    
+            print(f"Error predicting fee rates: {str(e)}")
+            current = self.get_mempool_feerates()
+            return {"fast": current["fast"], "medium": current["medium"], "low": current["low"]}

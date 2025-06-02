@@ -14,14 +14,16 @@ if __name__ == "__main__":
 
     latest_block_in_db = blockchain_storing.get_latest_stored_block()
     print(latest_block_in_db)
-
+    
     blockchain_storing.delete_existing_block_data(latest_block_in_db)
     blockchain_storing.delete_existing_block_data(latest_block_in_db-1)
     blockchain_storing.delete_existing_block_data(latest_block_in_db-2)
 
-    #latest_block_in_db = blockchain_storing.get_latest_stored_block()
-    #print(latest_block_in_db)
-    #latest_block = node.rpc_call("getblockcount", [])["result"]
+    latest_block_in_db = blockchain_storing.get_latest_stored_block()
+    print(latest_block_in_db)
+    
+    latest_block = node.rpc_call("getblockcount", [])["result"]
 
-    #if latest_block_in_db < latest_block:
-    #    blockchain_storing.sync_blocks(latest_block_in_db + 1, latest_block)
+    if latest_block_in_db < latest_block:
+        blockchain_storing.sync_blocks(latest_block_in_db + 1, latest_block)
+    

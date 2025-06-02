@@ -6,7 +6,7 @@ import time
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 from Mempool.mempool import Mempool
-from WhaleTracking.whale_tracking import WhaleTracking
+#from WhaleTracking.whale_tracking import WhaleTracking
 from NodeConnect.node_connect import NodeConnect
 from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI, RPC_USER_LOCAL, RPC_PASSWORD_LOCAL, RPC_HOST_LOCAL
 
@@ -14,10 +14,11 @@ from node_data import RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI, RPC_US
 
 if __name__ == "__main__":
         raspi = NodeConnect(RPC_USER_RASPI, RPC_PASSWORD_RASPI, RPC_HOST_RASPI).get_node()
-        whaletracking = WhaleTracking(node=raspi)
-        mempool = Mempool(raspi)
+        #whaletracking = WhaleTracking(node=raspi)
+        mempool = Mempool(raspi, "/media/henning/Volume/Programming/projectX/src/test/mempool_test.db")
         while True:
-            whaletracking.get_whale_transactions()
+            #whaletracking.get_whale_transactions()
             mempool.get_mempool_feerates()
-            print(f"✅ Data stored at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            #print(f"✅ Data stored at {time.strftime('%Y-%m-%d %H:%M:%S')}")
             time.sleep(60)  # Run every 60 seconds

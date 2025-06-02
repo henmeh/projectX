@@ -1,5 +1,6 @@
 import yfinance as yf
 import psycopg2
+import numpy as np
 
 import logging
 
@@ -21,7 +22,7 @@ class Marketdata:
             "port": 5432,
             "dbname": "macro_data_db",
             "user": "postgres",
-            "password": ""
+            "password": "projectX"
         }
 
         self.assets = {
@@ -50,14 +51,14 @@ class Marketdata:
         logging.info(f"📦 Fetching historical data for {symbol} ({period}, {interval})...")
         ticker = yf.Ticker(symbol)
         hist = ticker.history(period=period, interval=interval)
-        hist = hist.fillna({'Volume': None})
+        hist = hist.fillna(value=np.nan)
         return hist
     
 
     def fetch_live_macro_data(self, ticker, start, end):
         logging.info(f"📦 Fetching live data for {ticker} from {start} to {end}...")
         live = yf.download(ticker, start=start, end=end)
-        live = live.fillna({'Volume': None})
+        live = live.fillna(value=np.nan)
         return live
     
 
