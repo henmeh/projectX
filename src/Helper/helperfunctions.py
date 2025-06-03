@@ -38,6 +38,16 @@ def fetch_data(path_to_db:str, sql_command:str) -> list:
     return rows
 
 
+def fetch_data_params(path_to_db: str, sql_command: str, params: tuple) -> list:
+    """Fetches data from SQLite database with parameterized query"""
+    conn = sqlite3.connect(path_to_db)
+    cursor = conn.cursor()
+    cursor.execute(sql_command, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+
 def get_existing_txids(path_to_db: str, txids: list) -> set:
     """Fetch existing txids from the database to avoid duplicate processing."""
     query = f"SELECT txid FROM mempool_transactions WHERE txid IN ({','.join(['?']*len(txids))})"

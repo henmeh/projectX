@@ -1,9 +1,15 @@
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import IsolationForest
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_whale_transactions
+from datetime import datetime, timedelta
+from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_data_params, fetch_data
+
 
 class WhaleTracking:
     def __init__(self, node, db_path: str, days=7):
+        #if not isinstance(node, Node):
+        #    raise ValueError("node must be an instance of Node or its subclass")
+        
         self.node = node
         self.db_path = db_path
         self.days = days
@@ -44,41 +50,39 @@ class WhaleTracking:
             behavior_pattern TEXT,
             last_updated DATETIME)''')
 
-    async def process_tx_batch(self, txids: list, threshold: float):
-        """Async batch processing of transactions"""
-        btc_price = fetch_btc_price()
-        whale_alert = WhaleAlerts(self.db_path)
-        
-        async with aiohttp.ClientSession() as session:
-            tasks = [self._process_single_tx(session, txid, threshold, btc_price, whale_alert) 
-                    for txid in txids]
-            await asyncio.gather(*tasks)
 
-    async def _process_single_tx(self, session, txid, threshold, btc_price, whale_alert):
-        """Process a single transaction asynchronously"""
+    def process_transaction(self, txid: str, threshold: float, btc_price: float):
+        """
+        Process a single whale transaction and store it in the database
+        Returns True if processed successfully, False otherwise
+        """
         try:
-            tx = await self.node.async_rpc_call("getrawtransaction", [txid, True])
-            
-            if "error" in tx:
-                return
+            # Fetch transaction data
+            tx = self.node.rpc_call("getrawtransaction", [txid, True])
+            if "error" in tx or "result" not in tx:
+                return False
                 
-            tx = tx["result"]
-            total_sent = sum(out["value"] for out in tx.get("vout", []))
+            tx_data = tx["result"]
+            total_sent = sum(out["value"] for out in tx_data.get("vout", []))
             
+            # Skip if below threshold
             if total_sent < threshold:
-                return
+                return False
                 
             # Process inputs
             input_sum = 0
             input_addresses = []
-            for vin in tx.get("vin", []):
-                if "txid" in vin:
-                    prev_tx = await self.node.async_rpc_call("getrawtransaction", [vin["txid"], True])
-                    if "error" not in prev_tx:
-                        prev_out = prev_tx["result"]["vout"][vin["vout"]]
+            for vin in tx_data.get("vin", []):
+                if "txid" in vin and "vout" in vin:
+                    prev_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])
+                    if "error" not in prev_tx and "result" in prev_tx:
+                        prev_tx_data = prev_tx["result"]
+                        prev_out = prev_tx_data["vout"][vin["vout"]]
                         input_sum += prev_out["value"]
-                        addr = prev_out["scriptPubKey"].get("address", "")
-                        if addr:
+                        
+                        # Extract address from scriptPubKey
+                        if "address" in prev_out["scriptPubKey"]:
+                            addr = prev_out["scriptPubKey"]["address"]
                             input_addresses.append(addr)
                             store_data(
                                 self.db_path,
@@ -88,9 +92,10 @@ class WhaleTracking:
             
             # Process outputs
             output_addresses = []
-            for vout in tx.get("vout", []):
-                addr = vout["scriptPubKey"].get("address", "")
-                if addr:
+            for vout in tx_data.get("vout", []):
+                script_pubkey = vout.get("scriptPubKey", {})
+                if "address" in script_pubkey:
+                    addr = script_pubkey["address"]
                     output_addresses.append(addr)
                     store_data(
                         self.db_path,
@@ -100,86 +105,203 @@ class WhaleTracking:
             
             # Calculate fees
             fee_paid = input_sum - total_sent
-            fee_per_vbyte = fee_paid * 1e8 / tx["vsize"]  # Convert to sat/vB
+            fee_per_vbyte = (fee_paid * 1e8) / tx_data["vsize"] if tx_data["vsize"] > 0 else 0
             
             # Store transaction
             store_data(
                 self.db_path,
-                """INSERT OR IGNORE INTO whale_transactions 
+                """INSERT OR REPLACE INTO whale_transactions 
                 (txid, size, vsize, weight, fee_paid, fee_per_vbyte, total_sent, btcusd)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (txid, tx["size"], tx["vsize"], tx["weight"], fee_paid, fee_per_vbyte, total_sent, btc_price)
+                (txid, tx_data["size"], tx_data["vsize"], tx_data["weight"], 
+                 fee_paid, fee_per_vbyte, total_sent, btc_price)
             )
             
-            # Check for alert
-            if total_sent * btc_price >= whale_alert.get_alert_threshold():
-                whale_alert.detect_unusual_activity({
-                    "txid": txid,
-                    "sum_btc_sent": total_sent,
-                    "sum_usd_sent": total_sent * btc_price,
-                    "tx_in_addr": input_addresses,
-                    "tx_out_addr": output_addresses
-                })
+            return True
         
         except Exception as e:
-            print(f"Error processing tx {txid}: {str(e)}")
+            print(f"Error processing transaction {txid}: {str(e)}")
+            return False
 
-    def analyze_whale_behavior(self, address):
-        """AI-powered behavior analysis"""
-        # Fetch historical transactions
-        query = """
-            SELECT timestamp, total_sent, fee_per_vbyte 
-            FROM whale_transactions wt
-            JOIN transaction_inputs ti ON wt.txid = ti.txid
-            WHERE ti.address = ?
-            ORDER BY timestamp
+    def process_mempool_transactions(self, threshold: float = 100, batch_size: int = 25):
         """
-        data = fetch_data(self.db_path, query, (address,))
+        Scan mempool for whale transactions and process them in batches
+        Returns count of processed transactions
+        """
+        # Get mempool transaction IDs
+        mempool_txids = self.get_mempool_txids()
+        if not mempool_txids:
+            return 0
+            
+        btc_price = fetch_btc_price()
+        processed_count = 0
         
-        if not data:
-            return "No data available"
+        # Process in batches
+        for i in range(0, len(mempool_txids), batch_size):
+            batch = mempool_txids[i:i+batch_size]
+            for txid in batch:
+                if self.process_transaction(txid, threshold, btc_price):
+                    processed_count += 1
         
-        # Prepare features for ML
-        timestamps = [row[0] for row in data]
-        amounts = [row[1] for row in data]
-        fees = [row[2] for row in data]
+        return processed_count
+
+
+    def get_mempool_txids(self) -> list:
+        """Get transaction IDs from mempool"""
+        try:
+            response = self.node.rpc_call("getrawmempool", [])
+            return response.get("result", []) if "result" in response else []
+        except Exception:
+            return []
+
+
+    def analyze_whale_behavior(self, address: str) -> str:
+        """
+        Analyze whale behavior patterns using Isolation Forest for anomaly detection
+        Returns behavior classification as string
+        """
+        try:
+            # Fetch transaction history for this address using parameterized query
+            query = """
+                SELECT wt.timestamp, wt.total_sent, wt.fee_per_vbyte 
+                FROM whale_transactions wt
+                JOIN transaction_inputs ti ON wt.txid = ti.txid
+                WHERE ti.address = ?
+                ORDER BY wt.timestamp
+            """
+            data = fetch_data_params(self.db_path, query, (address,))
+            
+            if not data or len(data) < 3:  # Need at least 3 transactions for analysis
+                return "Insufficient Data"
+            
+            # Prepare data arrays
+            timestamps = []
+            amounts = []
+            fees = []
+            
+            for row in data:
+                # Convert timestamp string to datetime object
+                timestamp_str = row[0]
+                if '.' in timestamp_str:
+                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
+                else:
+                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
+                timestamps.append(dt)
+                amounts.append(row[1])
+                fees.append(row[2])
+            
+            # Calculate time-based features
+            time_diffs = []
+            if len(timestamps) > 1:
+                for i in range(1, len(timestamps)):
+                    diff = (timestamps[i] - timestamps[i-1]).total_seconds()
+                    time_diffs.append(diff)
+                avg_time_diff = np.mean(time_diffs) if time_diffs else 0
+            else:
+                avg_time_diff = 0
+            
+            # Calculate amount-based features
+            avg_amount = np.mean(amounts) if amounts else 0
+            
+            # Calculate fee-based features
+            avg_fee = np.mean(fees) if fees else 0
+            
+            # Prepare features for anomaly detection
+            if len(amounts) > 1 and len(fees) > 1:
+                features = np.array(list(zip(amounts, fees)))
+                
+                # Only run anomaly detection if we have enough data
+                if len(features) > 10:
+                    clf = IsolationForest(contamination=0.1, random_state=42)
+                    anomalies = clf.fit_predict(features)
+                    anomaly_ratio = np.sum(anomalies == -1) / len(features)
+                else:
+                    anomaly_ratio = 0
+            else:
+                anomaly_ratio = 0
+            
+            # Classify behavior based on features
+            behavior = "Normal"
+            if anomaly_ratio > 0.3:
+                behavior = "Erratic"
+            elif avg_time_diff < 3600 and len(timestamps) > 5:  # More than 1 transaction per hour
+                behavior = "Frequent Trader"
+            elif avg_amount >= 100:  # Changed to >= for better threshold handling
+                behavior = "Large Transactor"
+            
+            # Store behavior classification
+            store_data(
+                self.db_path,
+                """INSERT OR REPLACE INTO whale_behavior 
+                (address, behavior_pattern, last_updated) 
+                VALUES (?, ?, CURRENT_TIMESTAMP)""",
+                (address, behavior)
+            )
+            
+            return behavior
         
-        # Time-based features
-        time_diffs = [timestamps[i+1] - timestamps[i] for i in range(len(timestamps)-1]
-        avg_time_diff = np.mean(time_diffs) if time_diffs else 0
+        except Exception as e:
+            print(f"Error analyzing whale behavior for {address}: {str(e)}")
+            return "Analysis Failed"
+
+
+    def get_whale_addresses(self, min_balance: float = 500) -> list:
+        """
+        Identify whale addresses based on transaction history and current balance
+        Returns list of whale addresses
+        """
+        try:
+            # Get addresses with large transaction history
+            query = """
+                SELECT DISTINCT address
+                FROM (
+                    SELECT address FROM transaction_inputs
+                    UNION ALL
+                    SELECT address FROM transaction_outputs
+                )
+                WHERE address IN (
+                    SELECT address FROM transaction_inputs
+                    JOIN whale_transactions ON transaction_inputs.txid = whale_transactions.txid
+                    WHERE whale_transactions.total_sent > 10
+                    GROUP BY address
+                    HAVING COUNT(*) > 3
+                )
+            """
+            candidate_addresses = [row[0] for row in fetch_data(self.db_path, query)]
+            
+            # Filter by current balance
+            whale_addresses = []
+            for address in candidate_addresses:
+                balance = self.get_address_balance(address)
+                if balance >= min_balance:
+                    whale_addresses.append(address)
+            
+            return whale_addresses
         
-        # Amount features
-        avg_amount = np.mean(amounts)
-        amount_std = np.std(amounts)
-        
-        # Fee features
-        avg_fee = np.mean(fees)
-        
-        # Anomaly detection
-        features = np.array([amounts, fees]).T
-        if len(features) > 1:
-            clf = IsolationForest(contamination=0.1)
-            anomalies = clf.fit_predict(features)
-            anomaly_count = sum(anomalies == -1)
-        else:
-            anomaly_count = 0
-        
-        # Behavior classification
-        behavior = "Normal"
-        if anomaly_count > len(features) * 0.3:
-            behavior = "Erratic"
-        elif avg_time_diff < 3600:  # 1 hour
-            behavior = "Frequent Trader"
-        elif avg_amount > 100:
-            behavior = "Large Transactor"
-        
-        # Store behavior pattern
-        store_data(
-            self.db_path,
-            """INSERT OR REPLACE INTO whale_behavior 
-            (address, behavior_pattern, last_updated) 
-            VALUES (?, ?, CURRENT_TIMESTAMP)""",
-            (address, behavior)
-        )
-        
-        return behavior
+        except Exception:
+            return []
+
+
+    def get_address_balance(self, address: str) -> float:
+        """Get current balance of an address"""
+        try:
+            response = self.node.rpc_call("getaddressbalance", [{"addresses": [address]}])
+            if "result" in response and "balance" in response["result"]:
+                # Balance is returned in satoshis, convert to BTC
+                return response["result"]["balance"] / 1e8
+            return 0
+        except Exception:
+            return 0
+
+    def track_whale_balances(self, addresses: list):
+        """Track and store balance history for whale addresses"""
+        for address in addresses:
+            balance = self.get_address_balance(address)
+            if balance > 0:  # Only store if we have a positive balance
+                store_data(
+                    self.db_path,
+                    """INSERT OR REPLACE INTO whale_balance_history 
+                    (address, timestamp, confirmed_balance) 
+                    VALUES (?, CURRENT_TIMESTAMP, ?)""",
+                    (address, balance)
+                )

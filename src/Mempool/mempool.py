@@ -36,6 +36,7 @@ class Mempool:
             medium_fee_pred REAL,
             low_fee_pred REAL)''')
 
+
     def get_mempool_feerates(self, block_vsize_limit: int = 1_000_000) -> dict:
         current_time = time.time()
         if self.fee_cache and (current_time - self.last_fetch_time) < self.cache_duration:
