@@ -6,7 +6,7 @@ import os
 import json
 from datetime import datetime, timedelta
 from WhaleTracking.whale_tracking import WhaleTracking
-from .fake_node import FakeNode
+from fake_node import FakeNode
 
 
 class TestWhaleTracking(unittest.TestCase):

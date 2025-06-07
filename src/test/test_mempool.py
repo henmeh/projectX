@@ -6,7 +6,7 @@ import time
 import os
 from datetime import datetime, timedelta
 from Mempool.mempool import Mempool
-from .fake_node import FakeNode, FailingNode
+from fake_node import FakeNode, FailingNode
 
 
 class TestMempool(unittest.TestCase):

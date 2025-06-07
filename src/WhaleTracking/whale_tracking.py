@@ -1,15 +1,22 @@
 import numpy as np
-import pandas as pd
 from sklearn.ensemble import IsolationForest
-from datetime import datetime, timedelta
+from datetime import datetime
 from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_data_params, fetch_data
-
+import psycopg2
+from psycopg2 import sql
 
 class WhaleTracking:
     def __init__(self, node, db_path: str, days=7):
         #if not isinstance(node, Node):
         #    raise ValueError("node must be an instance of Node or its subclass")
-        
+        self.db_params = {
+            "dbname": "bitcoin_blockchain",
+            "user": "postgres",
+            "password": "projectX",
+            "host": "localhost",
+            "port": 5432,
+        }
+
         self.node = node
         self.db_path = db_path
         self.days = days
@@ -282,16 +289,54 @@ class WhaleTracking:
             return []
 
 
-    def get_address_balance(self, address: str) -> float:
-        """Get current balance of an address"""
+    #def get_address_balance(self, address: str) -> float:
+    #    """Get current balance of an address"""
+    #    try:
+    #        response = self.node.rpc_call("getaddressbalance", [{"addresses": [address]}])
+    #        if "result" in response and "balance" in response["result"]:
+    #            # Balance is returned in satoshis, convert to BTC
+    #            return response["result"]["balance"] / 1e8
+    #        return 0
+    #    except Exception:
+    #        return 0
+
+    def get_address_balance(self, address):
+        """
+        Retrieve the balance of a Bitcoin address from the database
+        
+        Args:
+            db_params (dict): Database connection parameters
+            address (str): Bitcoin address to query
+        
+        Returns:
+            int: Address balance in satoshis (or 0 if no UTXOs found)
+        """
         try:
-            response = self.node.rpc_call("getaddressbalance", [{"addresses": [address]}])
-            if "result" in response and "balance" in response["result"]:
-                # Balance is returned in satoshis, convert to BTC
-                return response["result"]["balance"] / 1e8
-            return 0
-        except Exception:
-            return 0
+            # Connect to the database
+            conn = psycopg2.connect(**self.db_params)
+            cursor = conn.cursor()
+            
+            # SQL query to sum unspent UTXOs
+            query = sql.SQL("""
+                SELECT COALESCE(SUM(value), 0)
+                FROM utxos
+                WHERE address = %s AND spent = false
+            """)
+            
+            # Execute the query
+            cursor.execute(query, (address,))
+            balance = cursor.fetchone()[0]
+            
+            return balance
+            
+        except psycopg2.Error as e:
+            print(f"Database error: {e}")
+            return None
+        finally:
+            # Ensure connection is closed even if error occurs
+            if conn:
+                conn.close()
+                
 
     def track_whale_balances(self, addresses: list):
         """Track and store balance history for whale addresses"""
