@@ -1,5 +1,9 @@
--- Create essential tables
+-- Drop existing tables
 DROP TABLE IF EXISTS public.transactions CASCADE;
+DROP TABLE IF EXISTS public.utxos CASCADE;
+DROP TABLE IF EXISTS public.addresses CASCADE;
+
+-- Create essential tables
 CREATE TABLE transactions (
     id BIGSERIAL PRIMARY KEY,
     txid TEXT NOT NULL,
@@ -13,7 +17,6 @@ CREATE TABLE transactions (
 	date TIMESTAMP NOT NULL
 ) TABLESPACE blockchain_space;
 
-DROP TABLE IF EXISTS public.utxos CASCADE;
 CREATE TABLE utxos (
     id BIGSERIAL PRIMARY KEY,
     txid TEXT NOT NULL,
@@ -29,10 +32,15 @@ CREATE TABLE utxos (
 	spent_in_txid TEXT
 ) TABLESPACE blockchain_space_part2;
 
-DROP TABLE IF EXISTS public.addresses CASCADE;
 CREATE TABLE addresses (
     address TEXT PRIMARY KEY,
     balance BIGINT NOT NULL DEFAULT 0,
     last_seen INTEGER NOT NULL,
 	date TIMESTAMP NOT NULL
 ) TABLESPACE blockchain_space_part2;
+
+-- Create Indexes
+CREATE INDEX CONCURRENTLY idx_transactions_date ON transactions (transaction_date);
+CREATE INDEX CONCURRENTLY idx_transactions_txid ON transactions (txid);
+CREATE INDEX CONCURRENTLY idx_utxos_address ON utxos (address);
+CREATE INDEX CONCURRENTLY idx_utxos_spent ON utxos (spent) WHERE NOT spent;

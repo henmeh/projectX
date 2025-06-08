@@ -18,12 +18,42 @@ class BlockchainStoring:
         }
         self.btc_price_cache = {}
         self.total_processed = 0
+        self.start_time = time.time()
+
+    #def connect_db(self):
+    #    """Establish connection with optimized settings"""
+    #    conn = psycopg2.connect(**self.db_params)
+    #    conn.autocommit = False
+    #    return conn
 
     def connect_db(self):
         """Establish connection with optimized settings"""
-        conn = psycopg2.connect(**self.db_params)
-        conn.autocommit = False
+        conn = psycopg2.connect(
+            **self.db_params,
+            application_name="BlockchainAnalytics",
+            connect_timeout=10
+        )
+        
+        # Set critical performance parameters
+        with conn.cursor() as cur:
+            try:
+                # Stack depth solution for recursion errors
+                cur.execute("SET max_stack_depth = '4096kB';")
+                
+                # Query optimization flags
+                cur.execute("SET enable_partition_pruning = on;")
+                cur.execute("SET constraint_exclusion = 'partition';")
+                cur.execute("SET work_mem = '64MB';")
+                
+                # Transaction configuration
+                cur.execute("SET idle_in_transaction_session_timeout = '5min';")
+                conn.commit()
+            except psycopg2.Error as e:
+                print(f"Warning: Could not set session parameters: {e}")
+                conn.rollback()
+        
         return conn
+
 
     def get_btc_price(self, timestamp):
         """Cached BTC price fetcher"""
@@ -31,6 +61,7 @@ class BlockchainStoring:
         if date not in self.btc_price_cache:
             self.btc_price_cache[date] = fetch_historical_btc_price(timestamp)
         return self.btc_price_cache[date]
+
 
     def process_block(self, block_height: int):
         """Process a block and store its data"""
@@ -44,13 +75,14 @@ class BlockchainStoring:
             block_time = block_data["time"]
             self.store_data(transactions, utxos, spent_utxos, address_changes, block_time)
             
-            return True
+            return len(transactions)
         
         except Exception as e:
             print(f"❌ Error processing block {block_height}: {e}")
             # Delete partially processed block
-            #self.delete_existing_block_data(block_height)
+            self.delete_existing_block_data(block_height)
             return False
+
 
     def extract_block_data(self, block_data, block_height):
         """Extract relevant data from block"""
@@ -82,13 +114,12 @@ class BlockchainStoring:
                 value = int(vout["value"] * 100000000)
                 
                 utxos.append((
-                    txid, vout["n"], address, value, 
-                    block_height, False, block_time, 
+                    txid, vout["n"], address, value,
+                    block_height, False, block_time,
                     btc_price_usd, output_type, datetime.datetime.fromtimestamp(block_time)
                 ))
                 
-                if address:
-                    address_changes[address] = address_changes.get(address, 0) + value
+                address_changes[address] = address_changes.get(address, 0) + value
 
         return transactions, utxos, spent_utxos, address_changes
 
@@ -99,9 +130,8 @@ class BlockchainStoring:
             return script_pubkey['address']
         if 'addresses' in script_pubkey and script_pubkey['addresses']:
             return script_pubkey['addresses'][0]
-        if script_pubkey["type"] == "pubkey":
+        else:
             return script_pubkey['asm']
-        return None
 
 
     def store_data(self, transactions, utxos, spent_utxos, address_changes, block_time):
@@ -144,7 +174,8 @@ class BlockchainStoring:
                     VALUES %s
                     ON CONFLICT (address) DO UPDATE SET 
                         balance = addresses.balance + EXCLUDED.balance,
-                        last_seen = EXCLUDED.last_seen""",
+                        last_seen = EXCLUDED.last_seen,
+                        date = EXCLUDED.date""",
                     data,
                 )
             conn.commit()
@@ -159,63 +190,27 @@ class BlockchainStoring:
 
     def sync_blocks(self, start_height: int, end_height: int = None):
         """Sync blocks with optimized performance"""
-        #if end_height is None:
-        #    end_height = self.node.rpc_call("getblockcount", [])["result"]
+        if end_height is None:
+            end_height = self.node.rpc_call("getblockcount", [])["result"]
         
         print(f"🚀 Syncing blocks {start_height}-{end_height}")
-        #self.start_time = time.time()
-        #self.total_processed = 0
+        self.total_processed = 0
         
         for height in range(start_height, end_height + 1):
             success = self.process_block(height)
-            #if not success:
-            #    print(f"⏸️ Stopping sync at block {height}")
-            #    return height  # Return last successful block
-            
-            # Periodically clear cache and show progress
-            #if height % 100 == 0:
-            #    self.btc_price_cache = {}
-            #    progress = 100 * (height - start_height) / (end_height - start_height)
-            #    print(f"⏱️ Processed block {height} ({progress:.1f}%)")
-                
-            # Create daily snapshots
-            #if height % 144 == 0:  # Approx daily (144 blocks/day)
-            #    self.create_address_snapshots(height)
+            print(f"🚀 Syncing block {height}/{success} Transactions from {end_height}")
 
-        #total_duration = time.time() - self.start_time
-        #total_rate = self.total_processed / total_duration
-        #print(f"✅ Blockchain sync complete! "
-        #      f"Processed {self.total_processed} transactions in {total_duration/60:.1f} minutes "
-        #      f"({total_rate:.1f} tx/s)")
-        #return end_height
+            if not success:
+                print(f"⏸️ Stopping sync at block {height}")
+                return height  # Return last successful block
 
-    def create_address_snapshots(self, block_height):
-        """Create daily address balance snapshots"""
-        try:
-            conn = self.connect_db()
-            cursor = conn.cursor()
-            
-            # Get current BTC price (use latest available)
-            cursor.execute("SELECT btc_price_usd FROM transactions ORDER BY timestamp DESC LIMIT 1")
-            btc_price = cursor.fetchone()[0] if cursor.rowcount > 0 else 0
-            
-            cursor.execute("""
-                INSERT INTO address_snapshots (address, snapshot_date, balance, btc_price_usd)
-                SELECT address, NOW()::date, balance, %s
-                FROM addresses
-                ON CONFLICT (address, snapshot_date) DO UPDATE SET
-                    balance = EXCLUDED.balance,
-                    btc_price_usd = EXCLUDED.btc_price_usd
-            """, (btc_price,))
-            
-            conn.commit()
-            print(f"📸 Created address snapshots at block {block_height}")
-        except Exception as e:
-            print(f"Snapshot error: {e}")
-            conn.rollback()
-        finally:
-            cursor.close()
-            conn.close()
+        total_duration = time.time() - self.start_time
+        total_rate = self.total_processed / total_duration
+        print(f"✅ Blockchain sync complete! "
+              f"Processed {self.total_processed} transactions in {total_duration/60:.1f} minutes "
+              f"({total_rate:.1f} tx/s)")
+        return end_height
+
 
     def get_address_balance(self, address: str):
         """Get current balance of an address"""
@@ -228,6 +223,7 @@ class BlockchainStoring:
                 result = cursor.fetchone()
                 return result[0] if result else 0
 
+
     def get_latest_stored_block(self):
         """Get highest block stored in database"""
         with self.connect_db() as conn:
@@ -236,6 +232,7 @@ class BlockchainStoring:
                     SELECT MAX(block_height) FROM transactions
                 """)
                 return cursor.fetchone()[0]
+
 
     def delete_existing_block_data(self, block_height):
         """Efficient block deletion for partitioned tables"""
@@ -276,24 +273,7 @@ class BlockchainStoring:
                     conn.rollback()
                     print(f"❌ Error deleting block {block_height}: {e}")
     
-    def get_daily_transaction_count(self):
-        """Get precomputed daily transaction counts"""
-        with self.connect_db() as conn:
-            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute("""
-                    SELECT date::text, count
-                    FROM daily_transaction_counts
-                    ORDER BY date
-                """)
-                return cursor.fetchall()
-    
-    def refresh_daily_counts(self):
-        """Refresh materialized view for daily counts"""
-        with self.connect_db() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute("REFRESH MATERIALIZED VIEW CONCURRENTLY daily_transaction_counts")
-                conn.commit()
-    
+  
     def get_block_data(self, block_height):
         """Get basic block information"""
         with self.connect_db() as conn:
@@ -308,6 +288,7 @@ class BlockchainStoring:
                     WHERE block_height = %s
                 """, (block_height,))
                 return cursor.fetchone()
+
 
     def get_address_history(self, address):
         """Get transaction history for an address"""
