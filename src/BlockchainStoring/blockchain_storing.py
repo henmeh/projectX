@@ -7,7 +7,7 @@ import time
 from Helper.helperfunctions import fetch_historical_btc_price
 
 class BlockchainStoring:
-    def __init__(self, node):
+    def __init__(self, node, testing=False):
         self.node = node
         self.db_params = {
             "dbname": "bitcoin_blockchain",
@@ -19,6 +19,16 @@ class BlockchainStoring:
         self.btc_price_cache = {}
         self.total_processed = 0
         self.start_time = time.time()
+
+        self.transactions_table = "transactions"
+        self.utxos_table = "utxos"
+        self.addresses_table = "addresses"
+
+        if testing:
+            self.transactions_table = "transactions_test"
+            self.utxos_table = "utxos_test"
+            self.addresses_table = "addresses_test"
+            
 
     #def connect_db(self):
     #    """Establish connection with optimized settings"""
@@ -38,7 +48,7 @@ class BlockchainStoring:
         with conn.cursor() as cur:
             try:
                 # Stack depth solution for recursion errors
-                cur.execute("SET max_stack_depth = '4096kB';")
+                cur.execute("SET max_stack_depth = '7680kB';")
                 
                 # Query optimization flags
                 cur.execute("SET enable_partition_pruning = on;")
@@ -142,7 +152,7 @@ class BlockchainStoring:
         try:
             execute_values(
                 cursor,
-                """INSERT INTO transactions (txid, block_height, timestamp, fee, 
+                f"""INSERT INTO {self.transactions_table} (txid, block_height, timestamp, fee, 
                     size, weight, raw_tx, btc_price_usd, date) 
                 VALUES %s """,
                 transactions
@@ -150,36 +160,39 @@ class BlockchainStoring:
             
             execute_values(
                     cursor,
-                    """INSERT INTO utxos (txid, vout, address, value, block_height, 
+                    f"""INSERT INTO {self.utxos_table} (txid, vout, address, value, block_height, 
                         spent, timestamp, btc_price_usd, output_type, date) 
                     VALUES %s """,
                     utxos
                 )
             
+            address_items = list(address_changes.items())
+            data = [(addr, change, block_time, datetime.datetime.fromtimestamp(block_time), block_time, datetime.datetime.fromtimestamp(block_time)) for addr, change in address_items]
+
+            execute_values(
+                    cursor,
+                    f"""INSERT INTO {self.addresses_table} (address, balance, first_seen, date_first_seen, last_seen, date_last_seen) 
+                    VALUES %s
+                    ON CONFLICT (address) DO UPDATE SET 
+                        balance = {self.addresses_table}.balance + EXCLUDED.balance,
+                        first_seen = COALESCE({self.addresses_table}.first_seen, EXCLUDED.first_seen),
+                        date_first_seen = COALESCE({self.addresses_table}.date_first_seen, EXCLUDED.date_first_seen),
+                        last_seen = EXCLUDED.last_seen,
+                        date_last_seen = EXCLUDED.date_last_seen""",
+                    data,
+                )
+            
             # Process spent UTXOs in batches
-            query = """
-                    UPDATE utxos 
+            query = f"""
+                    UPDATE {self.utxos_table} 
                     SET spent = TRUE, spent_in_txid = data.spent_in_txid
                     FROM (VALUES %s) AS data(txid, vout, spent_in_txid)
-                    WHERE utxos.txid = data.txid AND utxos.vout = data.vout
+                    WHERE {self.utxos_table}.txid = data.txid AND {self.utxos_table}.vout = data.vout
                 """
             execute_values(cursor, query, spent_utxos, template="(%s, %s, %s)")
 
-            # Update address balances in batches
-            address_items = list(address_changes.items())
-            data = [(addr, change, block_time, datetime.datetime.fromtimestamp(block_time)) for addr, change in address_items]
-            execute_values(
-                    cursor,
-                    """INSERT INTO addresses (address, balance, last_seen, date) 
-                    VALUES %s
-                    ON CONFLICT (address) DO UPDATE SET 
-                        balance = addresses.balance + EXCLUDED.balance,
-                        last_seen = EXCLUDED.last_seen,
-                        date = EXCLUDED.date""",
-                    data,
-                )
             conn.commit()
-                
+        
         except Exception as e:
             conn.rollback()
             raise e
@@ -198,11 +211,12 @@ class BlockchainStoring:
         
         for height in range(start_height, end_height + 1):
             success = self.process_block(height)
+            self.total_processed += success
             print(f"🚀 Syncing block {height}/{success} Transactions from {end_height}")
 
             if not success:
                 print(f"⏸️ Stopping sync at block {height}")
-                return height  # Return last successful block
+                return height
 
         total_duration = time.time() - self.start_time
         total_rate = self.total_processed / total_duration
@@ -217,19 +231,22 @@ class BlockchainStoring:
         with self.connect_db() as conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    "SELECT balance FROM addresses WHERE address = %s",
+                    f"SELECT value FROM {self.utxos_table} WHERE address = %s AND spent = False",
                     (address,)
                 )
-                result = cursor.fetchone()
-                return result[0] if result else 0
+                results = cursor.fetchall()
+                balance = 0
+                for result in results:
+                    balance += result[0] 
+                return balance
 
 
     def get_latest_stored_block(self):
         """Get highest block stored in database"""
         with self.connect_db() as conn:
             with conn.cursor() as cursor:
-                cursor.execute("""
-                    SELECT MAX(block_height) FROM transactions
+                cursor.execute(f"""
+                    SELECT MAX(block_height) FROM {self.transactions_table}
                 """)
                 return cursor.fetchone()[0]
 
@@ -242,26 +259,26 @@ class BlockchainStoring:
                 
                 try:
                     # Delete transactions (partition pruning will make this fast)
-                    cursor.execute("""
-                        DELETE FROM transactions 
+                    cursor.execute(f"""
+                        DELETE FROM {self.transactions_table} 
                         WHERE block_height = %s
                     """, (block_height,))
                     
                     # Delete UTXOs
-                    cursor.execute("""
-                        DELETE FROM utxos 
+                    cursor.execute(f"""
+                        DELETE FROM {self.utxos_table} 
                         WHERE block_height = %s
                     """, (block_height,))
                     
                     # Reset addresses balances
-                    cursor.execute("""
+                    cursor.execute(f"""
                         WITH address_changes AS (
                             SELECT address, SUM(-value) as delta
-                            FROM utxos
+                            FROM {self.utxos_table}
                             WHERE block_height = %s AND address IS NOT NULL
                             GROUP BY address
                         )
-                        UPDATE addresses a
+                        UPDATE {self.addresses_table} a
                         SET balance = a.balance + ac.delta
                         FROM address_changes ac
                         WHERE a.address = ac.address
@@ -278,13 +295,13 @@ class BlockchainStoring:
         """Get basic block information"""
         with self.connect_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(f"""
                     SELECT 
                         MIN(timestamp) AS block_time,
                         COUNT(*) AS tx_count,
                         SUM(fee) AS total_fees,
                         AVG(btc_price_usd) AS avg_btc_price
-                    FROM transactions
+                    FROM {self.transactions_table}
                     WHERE block_height = %s
                 """, (block_height,))
                 return cursor.fetchone()
@@ -294,7 +311,7 @@ class BlockchainStoring:
         """Get transaction history for an address"""
         with self.connect_db() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-                cursor.execute("""
+                cursor.execute(f"""
                     (SELECT 
                         t.txid,
                         t.block_height,
@@ -303,8 +320,8 @@ class BlockchainStoring:
                         u.value,
                         t.fee,
                         t.btc_price_usd
-                    FROM utxos u
-                    JOIN transactions t ON u.txid = t.txid
+                    FROM {self.utxos_table} u
+                    JOIN {self.transactions_table} t ON u.txid = t.txid
                     WHERE u.address = %s)
                     
                     UNION ALL
@@ -317,8 +334,8 @@ class BlockchainStoring:
                         -u.value AS value,
                         t.fee,
                         t.btc_price_usd
-                    FROM utxos u
-                    JOIN transactions t ON u.spent_in_txid = t.txid
+                    FROM {self.utxos_table} u
+                    JOIN {self.transactions_table} t ON u.spent_in_txid = t.txid
                     WHERE u.address = %s)
                     
                     ORDER BY timestamp DESC

@@ -1,12 +1,12 @@
 set default_tablespace ='';
 
 -- Drop existing tables
-DROP TABLE IF EXISTS public.transactions CASCADE;
-DROP TABLE IF EXISTS public.utxos CASCADE;
-DROP TABLE IF EXISTS public.addresses CASCADE;
+DROP TABLE IF EXISTS public.transactions_test CASCADE;
+DROP TABLE IF EXISTS public.utxos_test CASCADE;
+DROP TABLE IF EXISTS public.addresses_test CASCADE;
 
 -- Create essential tables
-CREATE TABLE transactions (
+CREATE TABLE transactions_test (
     id BIGSERIAL,
     txid TEXT NOT NULL,
     block_height INTEGER NOT NULL,
@@ -20,49 +20,49 @@ CREATE TABLE transactions (
 	PRIMARY KEY(id, block_height)
 ) PARTITION BY RANGE (block_height);
 
-CREATE TABLE transactions_000000_050000 PARTITION OF transactions
+CREATE TABLE transactions_test_000000_050000 PARTITION OF transactions_test
     FOR VALUES FROM (0) TO (50000) TABLESPACE blockchain_space; 
-CREATE TABLE transactions_050000_100000 PARTITION OF transactions
+CREATE TABLE transactions_test_050000_100000 PARTITION OF transactions_test
     FOR VALUES FROM (50000) TO (100000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_100000_150000 PARTITION OF transactions
+CREATE TABLE transactions_test_100000_150000 PARTITION OF transactions_test
     FOR VALUES FROM (100000) TO (150000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_150000_200000 PARTITION OF transactions
+CREATE TABLE transactions_test_150000_200000 PARTITION OF transactions_test
     FOR VALUES FROM (150000) TO (200000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_200000_250000 PARTITION OF transactions
+CREATE TABLE transactions_test_200000_250000 PARTITION OF transactions_test
     FOR VALUES FROM (200000) TO (250000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_250000_300000 PARTITION OF transactions
+CREATE TABLE transactions_test_250000_300000 PARTITION OF transactions_test
     FOR VALUES FROM (250000) TO (300000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_300000_350000 PARTITION OF transactions
+CREATE TABLE transactions_test_300000_350000 PARTITION OF transactions_test
     FOR VALUES FROM (300000) TO (350000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_350000_400000 PARTITION OF transactions
+CREATE TABLE transactions_test_350000_400000 PARTITION OF transactions_test
     FOR VALUES FROM (350000) TO (400000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_400000_450000 PARTITION OF transactions
+CREATE TABLE transactions_test_400000_450000 PARTITION OF transactions_test
     FOR VALUES FROM (400000) TO (450000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_450000_500000 PARTITION OF transactions
+CREATE TABLE transactions_test_450000_500000 PARTITION OF transactions_test
     FOR VALUES FROM (450000) TO (500000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_500000_550000 PARTITION OF transactions
+CREATE TABLE transactions_test_500000_550000 PARTITION OF transactions_test
     FOR VALUES FROM (500000) TO (550000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_550000_600000 PARTITION OF transactions
+CREATE TABLE transactions_test_550000_600000 PARTITION OF transactions_test
     FOR VALUES FROM (550000) TO (600000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_600000_650000 PARTITION OF transactions
+CREATE TABLE transactions_test_600000_650000 PARTITION OF transactions_test
     FOR VALUES FROM (600000) TO (650000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_650000_700000 PARTITION OF transactions
+CREATE TABLE transactions_test_650000_700000 PARTITION OF transactions_test
     FOR VALUES FROM (650000) TO (700000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_700000_750000 PARTITION OF transactions
+CREATE TABLE transactions_test_700000_750000 PARTITION OF transactions_test
     FOR VALUES FROM (700000) TO (750000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_750000_800000 PARTITION OF transactions
+CREATE TABLE transactions_test_750000_800000 PARTITION OF transactions_test
     FOR VALUES FROM (750000) TO (800000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_800000_850000 PARTITION OF transactions
+CREATE TABLE transactions_test_800000_850000 PARTITION OF transactions_test
     FOR VALUES FROM (800000) TO (850000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_850000_900000 PARTITION OF transactions
+CREATE TABLE transactions_test_850000_900000 PARTITION OF transactions_test
     FOR VALUES FROM (850000) TO (900000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_900000_950000 PARTITION OF transactions
+CREATE TABLE transactions_test_900000_950000 PARTITION OF transactions_test
     FOR VALUES FROM (900000) TO (950000) TABLESPACE blockchain_space;
-CREATE TABLE transactions_950000_1000000 PARTITION OF transactions
+CREATE TABLE transactions_test_950000_1000000 PARTITION OF transactions_test
     FOR VALUES FROM (950000) TO (1000000) TABLESPACE blockchain_space;
 
 
-CREATE TABLE utxos (
+CREATE TABLE utxos_test (
     id BIGSERIAL,
     txid TEXT NOT NULL,
     vout INTEGER NOT NULL,
@@ -78,49 +78,49 @@ CREATE TABLE utxos (
 	PRIMARY KEY (id, block_height)
 ) PARTITION BY RANGE (block_height);
 
-CREATE TABLE utxos_000000_050000 PARTITION OF utxos
+CREATE TABLE utxos_test_000000_050000 PARTITION OF utxos_test
     FOR VALUES FROM (0) TO (50000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_050000_100000 PARTITION OF utxos
+CREATE TABLE utxos_test_050000_100000 PARTITION OF utxos_test
     FOR VALUES FROM (50000) TO (100000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_100000_150000 PARTITION OF utxos
+CREATE TABLE utxos_test_100000_150000 PARTITION OF utxos_test
     FOR VALUES FROM (100000) TO (150000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_150000_200000 PARTITION OF utxos
+CREATE TABLE utxos_test_150000_200000 PARTITION OF utxos_test
     FOR VALUES FROM (150000) TO (200000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_200000_250000 PARTITION OF utxos
+CREATE TABLE utxos_test_200000_250000 PARTITION OF utxos_test
     FOR VALUES FROM (200000) TO (250000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_250000_300000 PARTITION OF utxos
+CREATE TABLE utxos_test_250000_300000 PARTITION OF utxos_test
     FOR VALUES FROM (250000) TO (300000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_300000_350000 PARTITION OF utxos
+CREATE TABLE utxos_test_300000_350000 PARTITION OF utxos_test
     FOR VALUES FROM (300000) TO (350000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_350000_400000 PARTITION OF utxos
+CREATE TABLE utxos_test_350000_400000 PARTITION OF utxos_test
     FOR VALUES FROM (350000) TO (400000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_400000_450000 PARTITION OF utxos
+CREATE TABLE utxos_test_400000_450000 PARTITION OF utxos_test
     FOR VALUES FROM (400000) TO (450000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_450000_500000 PARTITION OF utxos
+CREATE TABLE utxos_test_450000_500000 PARTITION OF utxos_test
     FOR VALUES FROM (450000) TO (500000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_500000_550000 PARTITION OF utxos
+CREATE TABLE utxos_test_500000_550000 PARTITION OF utxos_test
     FOR VALUES FROM (500000) TO (550000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_550000_600000 PARTITION OF utxos
+CREATE TABLE utxos_test_550000_600000 PARTITION OF utxos_test
     FOR VALUES FROM (550000) TO (600000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_600000_650000 PARTITION OF utxos
+CREATE TABLE utxos_test_600000_650000 PARTITION OF utxos_test
     FOR VALUES FROM (600000) TO (650000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_650000_700000 PARTITION OF utxos
+CREATE TABLE utxos_test_650000_700000 PARTITION OF utxos_test
     FOR VALUES FROM (650000) TO (700000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_700000_750000 PARTITION OF utxos
+CREATE TABLE utxos_test_700000_750000 PARTITION OF utxos_test
     FOR VALUES FROM (700000) TO (750000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_750000_800000 PARTITION OF utxos
+CREATE TABLE utxos_test_750000_800000 PARTITION OF utxos_test
     FOR VALUES FROM (750000) TO (800000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_800000_850000 PARTITION OF utxos
+CREATE TABLE utxos_test_800000_850000 PARTITION OF utxos_test
     FOR VALUES FROM (800000) TO (850000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_850001_900000 PARTITION OF utxos
+CREATE TABLE utxos_test_850001_900000 PARTITION OF utxos_test
     FOR VALUES FROM (850000) TO (900000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_900000_950000 PARTITION OF utxos
+CREATE TABLE utxos_test_900000_950000 PARTITION OF utxos_test
     FOR VALUES FROM (900000) TO (950000) TABLESPACE blockchain_space_part2;
-CREATE TABLE utxos_950000_1000000 PARTITION OF utxos
+CREATE TABLE utxos_test_950000_1000000 PARTITION OF utxos_test
     FOR VALUES FROM (950000) TO (1000000) TABLESPACE blockchain_space_part2;
 
 
-CREATE TABLE addresses (
+CREATE TABLE addresses_test (
     address TEXT PRIMARY KEY,
     balance BIGINT NOT NULL DEFAULT 0,
     first_seen INTEGER NOT NULL,
@@ -130,10 +130,10 @@ CREATE TABLE addresses (
 ) TABLESPACE blockchain_space_part2;
 
 -- Create Indexes
-CREATE INDEX idx_transactions_txid ON transactions (txid);
-CREATE INDEX idx_transactions_block_height ON transactions (block_height);
-CREATE INDEX idx_transactions_date ON transactions USING BRIN (date);
-CREATE INDEX idx_utxos_address_spent ON utxos (address) WHERE NOT spent;
-CREATE INDEX idx_utxos_txid_vout ON utxos (txid, vout);
-CREATE INDEX idx_utxos_spent_in ON utxos (spent_in_txid) WHERE spent;
-CREATE INDEX idx_addresses_address ON addresses (address)
+CREATE INDEX idx_transactions_test_txid ON transactions_test (txid);
+CREATE INDEX idx_transactions_test_block_height ON transactions_test (block_height);
+CREATE INDEX idx_transactions_test_date ON transactions_test USING BRIN (date);
+CREATE INDEX idx_utxos_test_address_spent ON utxos_test (address) WHERE NOT spent;
+CREATE INDEX idx_utxos_test_txid_vout ON utxos_test (txid, vout);
+CREATE INDEX idx_utxos_test_spent_in ON utxos_test (spent_in_txid) WHERE spent;
+CREATE INDEX idx_addresses_test_address ON addresses_test (address)

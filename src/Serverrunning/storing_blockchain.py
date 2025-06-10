@@ -22,18 +22,18 @@ if __name__ == "__main__":
     #latest_block_in_db = blockchain_storing.get_latest_stored_block()
     #print(latest_block_in_db)
     
-    #latest_block = node.rpc_call("getblockcount", [])["result"]
+    latest_block = node.rpc_call("getblockcount", [])["result"]
 
     #if latest_block_in_db < latest_block:
-    #blockchain_storing.sync_blocks(0, 1)
+    blockchain_storing.sync_blocks(0, latest_block)
     #blockchain_storing.sync_blocks(200000, 200500)
     #blockchain_storing.sync_blocks(500000, 500500)
     #blockchain_storing.sync_blocks(800000, 800500)
     
-    balance = blockchain_storing.get_address_balance("bc1qlscpz4ny0nz4x6dp0mk0k2qk8dnt8p4earqe0d")
-    print(balance)
+    #balance = blockchain_storing.get_address_balance("bc1qlscpz4ny0nz4x6dp0mk0k2qk8dnt8p4earqe0d")
+    #print(balance)
 
-    balance_history = blockchain_storing.get_address_history("bc1qlscpz4ny0nz4x6dp0mk0k2qk8dnt8p4earqe0d")
-    print(balance_history)
+    #balance_history = blockchain_storing.get_address_history("bc1qlscpz4ny0nz4x6dp0mk0k2qk8dnt8p4earqe0d")
+    #print(balance_history)
 
     #blockchain_storing.delete_existing_block_data(800000)
