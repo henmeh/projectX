@@ -24,7 +24,7 @@ CREATE TABLE mempool_fee_histogram (
 
 CREATE TABLE fee_predictions (
     id BIGSERIAL PRIMARY KEY,
-    timestamp INTEGER,
+    timestamp TIMESTAMP,
 	txid TEXT NOT NULL,
 	alert_type TEXT,
 	amount_btc REAL,
@@ -33,7 +33,7 @@ CREATE TABLE fee_predictions (
 
 CREATE TABLE alert_history (
     id BIGSERIAL PRIMARY KEY,
-    timestamp INTEGER,
+    timestamp TIMESTAMP,
     prediction_time INTEGER,
 	fast_fee_pred REAL,
     medium_fee_pred REAL,
@@ -47,7 +47,7 @@ CREATE TABLE alerted_events (
 
 CREATE TABLE whale_transactions (
 	txid TEXT PRIMARY KEY,
-	timestamp INTEGER,
+	timestamp TIMESTAMP,
 	size INTEGER,
 	vsize INTEGER,
 	weight INTEGER,
@@ -70,7 +70,7 @@ CREATE TABLE transactions_outputs (
 	
 CREATE TABLE whale_balance_history (
 		address TEXT,
-		timestamp INTEGER,
+		timestamp TIMESTAMP,
 		confirmed_balance REAL,
 		unconfirmed_balance REAL,
 		PRIMARY KEY (address, timestamp)) TABLESPACE mempool;

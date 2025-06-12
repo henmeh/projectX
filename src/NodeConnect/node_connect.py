@@ -47,7 +47,7 @@ class NodeConnect():
         return response.json()
 
 
-    def rpc_batch_call(self, method: str, params: list) -> json:
+    def rpc_batch_call(self, method: str, params: list) -> list:
         """Helper function to call Bitcoin Core RPC with batch requests"""
         batch = [[method, param, True] for param in params]
         try:
