@@ -11,7 +11,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 class Mempool:
-    def __init__(self, node, db_path: str):
+    def __init__(self, node):
         #if not isinstance(node, Node):
         #    raise ValueError("node must be an instance of Node or its subclass")
             
@@ -23,7 +23,6 @@ class Mempool:
             "host": "localhost",
             "port": 5432,
         }
-        self.db_path = db_path
         self.last_fetch_time = 0
         self.fee_cache = None
         self.cache_duration = 60

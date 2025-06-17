@@ -1,9 +1,8 @@
 import json
 import time
+import datetime
 import psycopg2
 from psycopg2.extras import execute_values
-import datetime
-import time
 from Helper.helperfunctions import fetch_historical_btc_price
 
 class BlockchainStoring:

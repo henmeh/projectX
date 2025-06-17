@@ -54,5 +54,11 @@ class NodeConnect():
             responses = self.rpc.batch_(batch)
             return responses
         except Exception as e:
-            print(f"RPC Error: {e}")
-            return []
+            responses = []
+            for param in params:
+                response = self.rpc_call(method, [param])
+                if response["result"] is not None:
+                    responses.append(response)
+                else:
+                    print(f"RPC Error: {e} for txid {param}")
+            return responses

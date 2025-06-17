@@ -59,14 +59,16 @@ CREATE TABLE whale_transactions (
 CREATE TABLE transactions_inputs (
 	txid TEXT,
 	address TEXT,
-	value REAL,
-	FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
-            
+	value REAL
+	--FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
+    ) TABLESPACE mempool;
+	
 CREATE TABLE transactions_outputs (
 	txid TEXT,
 	address TEXT,
-	value REAL,
-	FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
+	value REAL
+	--FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
+	) TABLESPACE mempool;
 	
 CREATE TABLE whale_balance_history (
 		address TEXT,

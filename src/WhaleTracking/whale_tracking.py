@@ -49,7 +49,7 @@ class WhaleTracking:
         
         return conn
         
-
+    
     def process_transaction(self, txid: list, threshold: float, btc_price: float):
         """
         Process a single whale transaction and store it in the database
@@ -58,90 +58,96 @@ class WhaleTracking:
         conn = self.connect_db()
         cursor = conn.cursor()
 
-        try:
+        try:            
             # Fetch transaction data
-            tx = self.node.rpc_batch_call("getrawtransaction", txid)[0]
-
-            total_sent = sum(float(out["value"]) for out in tx.get("vout", []))
-
-            # Skip if below threshold
-            #if total_sent < threshold:
-            #    return False
-                
-            # Process inputs
-            input_sum = 0
-            input_addresses = []
-            current_txid = tx.get("txid", 0)
-            vin_txids = []
-
-            # Store transaction
-            # Calculate fees
-            fee_paid = input_sum - total_sent
-            fee_per_vbyte = (fee_paid * 1e8) / tx_data["vsize"] if tx_data["vsize"] > 0 else 0
+            transactions = self.node.rpc_batch_call("getrawtransaction", txid)
             
-            store_data(
-                self.db_path,
-                """INSERT OR REPLACE INTO whale_transactions 
-                (txid, size, vsize, weight, fee_paid, fee_per_vbyte, total_sent, btcusd)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (txid, tx_data["size"], tx_data["vsize"], tx_data["weight"], 
-                 fee_paid, fee_per_vbyte, total_sent, btc_price)
-            )
+            for transaction in transactions:
+                total_sent = sum(float(transaction_output["value"]) for transaction_output in transaction.get("vout", []))
 
-            for vin in tx.get("vin", []):
-                if "txid" in vin and "vout" in vin:
-                    vin_txids.append(vin["txid"])
+                # Skip if below threshold
+                if total_sent < threshold:
+                    return False
+                
+                # Process inputs
+                input_sum = 0
+                input_addresses = []
+                current_txid = transaction.get("txid", 0)
+                vin_txids = []
+                vin_vouts = []
+
+                for transaction_input in transaction.get("vin", []):
+                    if "txid" in transaction_input and "vout" in transaction_input:
+                        vin_txids.append(transaction_input["txid"])
+                        vin_vouts.append(transaction_input["vout"])
+
+                prev_txs = self.node.rpc_batch_call("getrawtransaction", vin_txids)
                     
-                    #batches erzeugen für sehr viele input transaktionen -> fehlt noch
-                    prev_tx = self.node.rpc_batch_call("getrawtransaction", vin_txids)[0]
-                    
-                    #prev_tx = self.node.rpc_call("getrawtransaction", [vin["txid"], True])
-                    
-                    prev_out = prev_tx["vout"][vin["vout"]]
+                i = 0
+                for prev_tx in prev_txs:
+                    prev_out = prev_tx["vout"][vin_vouts[i]]
                     input_sum += float(prev_out["value"])
-                        
-                    # Extract address from scriptPubKey
+                    i += 1
+                    
                     if "address" in prev_out["scriptPubKey"]:
                         addr = prev_out["scriptPubKey"]["address"]
                     else:
                         addr = prev_out["scriptPubKey"]["asm"]
                     
                     input_addresses.append(addr)
-                    print(current_txid)
-                    print(addr)
-                    print(float(prev_out["value"]))
-                    insert_data = [(current_txid, addr, float(prev_out["value"]))] 
+                    insert_data = [(current_txid, addr, float(prev_out["value"]))]
+                    
                     execute_values(
                         cursor,
                         "INSERT INTO transactions_inputs (txid, address, value) VALUES %s",
-                        insert_data,
-                    )
-                    #store_data(
-                    #    self.db_path,
-                    #    "INSERT INTO transaction_inputs (txid, address, value) VALUES (?, ?, ?)",
-                    #    (txid, addr, prev_out["value"])
-                    #)
-            return
-            # Process outputs
-            output_addresses = []
-            for vout in tx_data.get("vout", []):
-                script_pubkey = vout.get("scriptPubKey", {})
-                if "address" in script_pubkey:
-                    addr = script_pubkey["address"]
-                    output_addresses.append(addr)
-                    store_data(
-                        self.db_path,
-                        "INSERT INTO transaction_outputs (txid, address, value) VALUES (?, ?, ?)",
-                        (txid, addr, vout["value"])
+                        insert_data
                     )
 
+                output_addresses = []
+                for vout in transaction.get("vout", []):
+                    script_pubkey = vout.get("scriptPubKey", {})
+                    if "address" in script_pubkey:
+                        addr = script_pubkey["address"]
+                    else:
+                        addr = script_pubkey["asm"]
+                    output_addresses.append(addr)
+                    insert_data = [(current_txid, addr, float(vout["value"]))]
+                    
+                    execute_values(
+                        cursor,
+                        "INSERT INTO transactions_outputs (txid, address, value) VALUES %s",
+                        insert_data
+                    )
+            
+                fee_paid = input_sum - total_sent
+                fee_per_vbyte = (fee_paid * 1e8) / transaction["vsize"] if transaction["vsize"] > 0 else 0
+                insert_data = [(current_txid, datetime.now(), transaction["size"], transaction["vsize"], transaction["weight"], fee_paid, fee_per_vbyte, total_sent, btc_price)] 
+                
+                execute_values(
+                    cursor,
+                    """INSERT INTO whale_transactions 
+                    (txid, timestamp, size, vsize, weight, fee_paid, fee_per_vbyte, total_sent, btcusd)
+                    VALUES %s
+                    ON CONFLICT (txid) DO UPDATE SET
+                    timestamp = EXCLUDED.timestamp,
+                    size = EXCLUDED.size,
+                    vsize = EXCLUDED.vsize,
+                    weight = EXCLUDED.weight,
+                    fee_paid = EXCLUDED.fee_paid,
+                    fee_per_vbyte = EXCLUDED.fee_per_vbyte,
+                    total_sent = EXCLUDED.total_sent,
+                    btcusd = EXCLUDED.btcusd""",
+                    insert_data
+                )
+                conn.commit()
+
             return True
-        
         except Exception as e:
             print(f"Error processing transaction {txid}: {str(e)}")
             return False
-
-    def process_mempool_transactions(self, threshold: float = 100, batch_size: int = 1):
+    
+    
+    def process_mempool_transactions(self, threshold: float = 100, batch_size: int = 100) -> int:
         """
         Scan mempool for whale transactions and process them in batches
         Returns count of processed transactions
@@ -154,11 +160,9 @@ class WhaleTracking:
         btc_price = 0#fetch_btc_price()
         processed_count = 0
         
-        # Process in batches
-        #for i in range(0, len(mempool_txids), batch_size):
-        for i in range(0, 2, batch_size):
+        for i in range(0, len(mempool_txids), batch_size):
+        #for i in range(0, 2, batch_size):
             txid_batch = mempool_txids[i:i+batch_size]
-            #for txid in batch:
             if self.process_transaction(txid_batch, threshold, btc_price):
                 processed_count += 1
         
