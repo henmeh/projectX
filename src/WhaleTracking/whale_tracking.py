@@ -64,6 +64,9 @@ class WhaleTracking:
             
             for transaction in transactions:
                 total_sent = sum(float(transaction_output["value"]) for transaction_output in transaction.get("vout", []))
+                
+                if total_sent >= threshold:
+                    print(total_sent)
 
                 # Skip if below threshold
                 if total_sent < threshold:
@@ -152,16 +155,14 @@ class WhaleTracking:
         Scan mempool for whale transactions and process them in batches
         Returns count of processed transactions
         """
-        # Get mempool transaction IDs
         mempool_txids = self.get_mempool_txids()
         if not mempool_txids:
             return 0
             
-        btc_price = 0#fetch_btc_price()
+        btc_price = fetch_btc_price()
         processed_count = 0
         
         for i in range(0, len(mempool_txids), batch_size):
-        #for i in range(0, 2, batch_size):
             txid_batch = mempool_txids[i:i+batch_size]
             if self.process_transaction(txid_batch, threshold, btc_price):
                 processed_count += 1
