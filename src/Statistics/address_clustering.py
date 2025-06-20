@@ -10,17 +10,30 @@ import time
 from functools import lru_cache
 import heapq
 from typing import List, Dict, Tuple, Set, Any
+import psycopg2
+from psycopg2.extras import execute_values
+import logging
 
 class AddressClustering:
-    def __init__(self, db_path: str, days: int = 7, min_cluster_size: int = 2):
-        self.db_path = db_path
+    def __init__(self, days: int = 7, min_cluster_size: int = 2):
         self.days = days
         self.min_cluster_size = min_cluster_size
         self.graph = nx.Graph()
         self.cluster_cache = {}
         self.cluster_version = 0
         self.last_clustering_time = 0
+        self.logger = logging.getLogger('whale_clustering')
+
+        self.db_params = {
+            "dbname": "bitcoin_blockchain",
+            "user": "postgres",
+            "password": "projectX",
+            "host": "localhost",
+            "port": 5432,
+        }
+
         
+        """
         # Initialize database schema
         with sqlite3.connect(self.db_path) as conn:
             conn.execute('''CREATE TABLE IF NOT EXISTS address_clusters (
@@ -50,23 +63,52 @@ class AddressClustering:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cluster_id ON address_clusters(cluster_id)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_address ON address_clusters(address)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_cluster_version ON cluster_metadata(version)")
+            """
+        
+    def connect_db(self):
+        """Establish connection with optimized settings"""
+        conn = psycopg2.connect(
+            **self.db_params,
+            application_name="BlockchainAnalytics",
+            connect_timeout=10
+        )
+        
+        # Set critical performance parameters
+        with conn.cursor() as cur:
+            try:
+                # Stack depth solution for recursion errors
+                cur.execute("SET max_stack_depth = '7680kB';")
+                
+                # Query optimization flags
+                cur.execute("SET enable_partition_pruning = on;")
+                cur.execute("SET constraint_exclusion = 'partition';")
+                cur.execute("SET work_mem = '64MB';")
+                
+                # Transaction configuration
+                cur.execute("SET idle_in_transaction_session_timeout = '5min';")
+                conn.commit()
+            except psycopg2.Error as e:
+                print(f"Warning: Could not set session parameters: {e}")
+                conn.rollback()
+        
+        return conn    
     
     # ----------------------
     # Core Clustering Methods
     # ----------------------
     
-    def _build_transaction_graph(self, transactions: List[Dict]) -> None:
+    def _build_transaction_graph(self, transactions: list[dict]) -> bool:
         """Build multi-relational graph with memoization and incremental updates"""
         start_time = time.time()
         self.graph = nx.Graph()
-        
+
         for tx in transactions:
-            input_addrs = tx["tx_in_addr"]
-            output_addrs = [out["address"] for out in tx["tx_out_addr"]]
-            output_values = [out["value"] for out in tx["tx_out_addr"]]
-            
+            input_addrs = [input[0] for input in tx["inputs"]]
+            output_addrs = [output[0] for output in tx["outputs"]]
+            output_values = [output[1] for output in tx["outputs"]]
+
             # Common input heuristic (all inputs are connected)
-            for i in range(len(input_addrs)):
+            for i, _ in enumerate(input_addrs):
                 addr1 = input_addrs[i]
                 for j in range(i+1, len(input_addrs)):
                     addr2 = input_addrs[j]
@@ -81,6 +123,9 @@ class AddressClustering:
                             self._add_edge(addr1, addr_out, 0.7, "change_detection")
         
         print(f"Graph built with {len(self.graph.nodes())} nodes in {time.time()-start_time:.2f}s")
+
+        return True
+    
     
     def _add_edge(self, addr1: str, addr2: str, weight: float, edge_type: str) -> None:
         """Add edge with cumulative weighting and type tracking"""
@@ -93,53 +138,107 @@ class AddressClustering:
         else:
             self.graph.add_edge(addr1, addr2, weight=weight, types={edge_type})
     
-    @lru_cache(maxsize=10000)
-    def _get_address_features(self, address: str) -> Tuple[float, ...]:
-        """Memoized feature extraction for addresses"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute(
-                "SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM transactions WHERE address = ?",
-                (address,)
-            )
-            row = cursor.fetchone()
-            
-        if not row or row[0] is None:
-            return (0, 0, 0, 0)
-        
-        count, first_seen, last_seen = row
-        now = datetime.now()
-        
-        # Calculate temporal features
-        lifetime = (now - datetime.fromisoformat(first_seen)).days if first_seen else 0
-        recency = (now - datetime.fromisoformat(last_seen)).days if last_seen else 0
-        avg_freq = count / max(1, lifetime) if lifetime > 0 else count
-        
-        return (count, lifetime, recency, avg_freq)
     
-    def _extract_features(self) -> Tuple[np.ndarray, List[str]]:
-        """Create feature matrix with graph and temporal features"""
-        features = []
+    @lru_cache(maxsize=10000)
+    def _get_address_features(self, address: str) -> tuple:
+        """Robust feature extraction with UTC time handling and edge cases"""
+        try:
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    # Use UTC timestamps directly in database calculations
+                    cursor.execute(
+                        """
+                        WITH addr_activity AS (
+                            SELECT tx_timestamp AS ts FROM transactions_inputs WHERE address = %s
+                            UNION ALL
+                            SELECT tx_timestamp FROM transactions_outputs WHERE address = %s
+                        )
+                        SELECT 
+                            COUNT(ts) AS tx_count,
+                            EXTRACT(EPOCH FROM (NOW() AT TIME ZONE 'UTC' - MIN(ts))) AS lifetime_sec,
+                            EXTRACT(EPOCH FROM (NOW() AT TIME ZONE 'UTC' - MAX(ts))) AS recency_sec,
+                            CASE WHEN COUNT(ts) > 1 
+                                 THEN EXTRACT(EPOCH FROM (MAX(ts) - MIN(ts))) 
+                                 ELSE 0 END AS active_duration_sec,
+                            CASE WHEN COUNT(ts) > 1 
+                                 THEN EXTRACT(EPOCH FROM (MAX(ts) - MIN(ts))) / (COUNT(ts) - 1)
+                                 ELSE 0 END AS avg_dwell_sec
+                        FROM addr_activity
+                        """,
+                        (address, address)
+                    )
+                    row = cursor.fetchone()
+                    
+                    if not row or row[0] is None:
+                        return (0.0, 0.0, 0.0, 0.0, 0.0)
+                    
+                    # Convert all values to floats immediately
+                    tx_count = float(row[0])
+                    lifetime_sec = float(row[1]) if row[1] else 0.0
+                    recency_sec = float(row[2]) if row[2] else 0.0
+                    active_duration_sec = float(row[3]) if row[3] else 0.0
+                    avg_dwell_sec = float(row[4]) if row[4] else 0.0
+                    
+                    return (tx_count, lifetime_sec, recency_sec, active_duration_sec, avg_dwell_sec)
+                    
+        except Exception as e:
+            self.logger.error(f"Feature error for {address}: {e}", exc_info=True)
+            return (0.0, 0.0, 0.0, 0.0, 0.0)
+
+
+    def _extract_features(self) -> tuple[np.ndarray, list[str]]:
+        """Optimized feature extraction with bulk processing and validation"""
+        if not self.graph.nodes:
+            return np.array([]), []
+            
         addresses = list(self.graph.nodes())
+        features = []
         
-        # Graph metrics as features
+        # Bulk precompute graph metrics - O(n) complexity
         degrees = dict(nx.degree(self.graph))
         clustering_coeffs = nx.clustering(self.graph)
         
+        # Precompute neighbor degrees in bulk
+        neighbor_degrees = {}
+        for node in self.graph.nodes():
+            neighbors = list(self.graph.neighbors(node))
+            if neighbors:
+                # Handle division safely
+                neighbor_degrees[node] = sum(degrees[n] for n in neighbors) / len(neighbors)
+            else:
+                neighbor_degrees[node] = 0.0
+        
+        # Process all addresses in batch
         for addr in addresses:
-            # Graph features
-            feat = [
-                degrees.get(addr, 0),
-                clustering_coeffs.get(addr, 0),
-                len(list(nx.common_neighbors(self.graph, addr, addr)))  # Number of common neighbors
-            ]
+            # Graph features - validate numeric types
+            deg = float(degrees.get(addr, 0))
+            cc = float(clustering_coeffs.get(addr, 0))
+            and_val = float(neighbor_degrees.get(addr, 0))
             
-            # Temporal features (memoized)
-            temporal_feats = self._get_address_features(addr)
-            feat.extend(temporal_feats)
+            # Temporal features
+            try:
+                temporal = self._get_address_features(addr)
+                # Validate feature dimensions
+                if len(temporal) != 5:
+                    raise ValueError(f"Invalid feature length: {len(temporal)}")
+                    
+                # Convert all to floats (safe handling)
+                temporal = tuple(float(x) for x in temporal)
+            except Exception as e:
+                self.logger.error(f"Feature error for {addr}: {str(e)}")
+                temporal = (0.0, 0.0, 0.0, 0.0, 0.0)
             
+            # Combine features
+            feat = [deg, cc, and_val]
+            feat.extend(temporal)
             features.append(feat)
         
-        return np.array(features), addresses
+        # Validate output dimensions
+        if len(features) != len(addresses):
+            self.logger.error(f"Feature count mismatch: {len(features)} vs {len(addresses)}")
+        
+        return np.array(features, dtype=np.float64), addresses
+    
     
     def _cluster_with_ml(self, features: np.ndarray, addresses: List[str]) -> List[List[str]]:
         """Density-based clustering with OPTICS and feature scaling"""
@@ -160,6 +259,7 @@ class AddressClustering:
                 clusters[label].append(addresses[idx])
         
         return list(clusters.values())
+    
     
     def _merge_clusters(self, clusters: List[List[str]]) -> List[List[str]]:
         """Hierarchical merging using Jaccard similarity"""
@@ -187,10 +287,12 @@ class AddressClustering:
         
         return [list(c) for c in merged_clusters]
     
+    
     def _generate_cluster_id(self, addresses: List[str]) -> str:
         """Deterministic cluster ID from sorted addresses"""
         sorted_addrs = sorted(addresses)
         return hashlib.sha256(','.join(sorted_addrs).encode()).hexdigest()[:16]
+    
     
     def _classify_entity(self, cluster_id: str, addresses: List[str]) -> str:
         """Classify cluster using behavioral patterns"""
@@ -406,6 +508,7 @@ class AddressClustering:
         self.store_clusters(final_clusters)
         print(f"Incremental update completed in {time.time()-start_time:.2f}s")
     
+    
     def _attach_to_existing(self, new_addresses: List[str], 
                             current_clusters: Dict[str, List[str]], 
                             graph: nx.Graph) -> List[List[str]]:
@@ -445,6 +548,7 @@ class AddressClustering:
             new_clusters.append(list(merged_cluster))
         
         return new_clusters
+    
     
     #you need to do this basedon your db structure
     def _fetch_related_transactions(self, addresses: Set[str]) -> List[Dict]:
@@ -508,6 +612,7 @@ class AddressClustering:
             "links": link_data
         }
     
+    
     def _sample_important_nodes(self, max_nodes: int) -> List[str]:
         """Sample important nodes using degree centrality"""
         if len(self.graph.nodes) <= max_nodes:
@@ -541,36 +646,87 @@ class AddressClustering:
     # Main Workflow
     # ----------------------
     
-    def run_clustering(self, whale_transactions: List[Dict]) -> List[List[str]]:
+    def run_clustering(self) -> list[list[str]]:
         """Main clustering pipeline with performance tracking"""
         start_time = time.time()
+
+        try:
+            whale_transactions = []
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT txid FROM whale_transactions",
+                        ()
+                    )
+                    result_ids = cursor.fetchall()
+                    whale_transaction_ids = [result_id[0] for result_id in result_ids]
+
+                    for whale_transaction_id in whale_transaction_ids[0:1]:
+                        cursor.execute(
+                        "SELECT address, value FROM transactions_inputs WHERE txid = %s",
+                        (whale_transaction_id,)
+                        )
+                        result_inputs = cursor.fetchall()
+
+                        cursor.execute(
+                        "SELECT address, value FROM transactions_outputs WHERE txid = %s",
+                        (whale_transaction_id,)
+                        )
+                        result_outputs = cursor.fetchall()
+
+                        whale_transaction = {"txid": whale_transaction_id, "inputs": result_inputs, "outputs": result_outputs}
+                        whale_transactions.append(whale_transaction)
+
+            # Build transaction graph
+            self._build_transaction_graph(whale_transactions)
+
+            # Extract features
+            features, addresses = self._extract_features()
+            print(features)
+            print(addresses)
+            """
+                Example output and explanation
+                features = [[2.00000000e+00 0.00000000e+00 1.00000000e+00 4.00000000e+00
+                            2.60293532e+05 2.60293532e+05 0.00000000e+00 0.00000000e+00]
+                            [1.00000000e+00 0.00000000e+00 2.00000000e+00 1.00000000e+00
+                            2.60293575e+05 2.60293575e+05 0.00000000e+00 0.00000000e+00]
+                            [1.00000000e+00 0.00000000e+00 2.00000000e+00 3.00000000e+00
+                            2.60293594e+05 1.75680280e+05 8.46133136e+04 4.23066568e+04]]
+                addresses = ['bc1qf6vc30jjmgkrayazenc8kxdatqg28jd0qhcvwc', 'bc1qzcjp2w7ujyp4gjc9nu9842238797d2enzfj6wx', '3J7cUjBZxvGRCwFBz3q23zAsnhFfZrDSSU']
+            
+                explanation for first row corrsponding to first address:
+                Index	Feature	            Unit	    Description	                Whale Significance
+                0	    deg	                count	    Number of connections	    Whale addresses have higher connectivity
+                1	    cc	                ratio (0-1)	Clustering coefficient	    Lower for whales (less interconnected neighbors)
+                2	    avg_neighbor_deg	count	    Average neighbor degree	    Higher for whales (connect to important addresses)
+                3	    tx_count	        count	    Total transactions	        Higher for exchange wallets
+                4	    lifetime_sec	    seconds	    Time since first appearance	Identifies new whales
+                5	    recency_sec	        seconds	    Time since last appearance	Detects awakening dormant whales
+                6	    active_duration_sec	seconds	    Time between first/last tx	Short for OTC, long for accumulation
+                7	    avg_dwell_sec	    seconds	    Average time between txs	Short = active trader, long = cold storage
+            """
+        except Exception as e:
+            print(e)        
+
         
-        if not whale_transactions:
-            print("No transactions provided for clustering")
-            return []
         
-        # Build transaction graph
-        self._build_transaction_graph(whale_transactions)
-        
-        # Extract features
-        features, addresses = self._extract_features()
         
         # Cluster using ML
-        ml_clusters = self._cluster_with_ml(features, addresses)
+        #ml_clusters = self._cluster_with_ml(features, addresses)
         
         # Merge clusters
-        merged_clusters = self._merge_clusters(ml_clusters)
+        #merged_clusters = self._merge_clusters(ml_clusters)
         
         # Filter small clusters
-        final_clusters = [c for c in merged_clusters if len(c) >= self.min_cluster_size]
+        #final_clusters = [c for c in merged_clusters if len(c) >= self.min_cluster_size]
         
         # Store results
-        self.store_clusters(final_clusters)
+        #self.store_clusters(final_clusters)
         
-        print(f"Clustering completed in {time.time()-start_time:.2f}s. "
-              f"Found {len(final_clusters)} clusters.")
+        #print(f"Clustering completed in {time.time()-start_time:.2f}s. "
+        #      f"Found {len(final_clusters)} clusters.")
         
-        return final_clusters
+        #return final_clusters
     
     def get_cluster_evolution(self, cluster_id: str) -> List[Dict]:
         """Get evolution history of a cluster"""
@@ -589,3 +745,7 @@ class AddressClustering:
                 "version": row[3],
                 "timestamp": row[4]
             } for row in cursor.fetchall()]
+
+if __name__ == "__main__":
+    cluster = AddressClustering()
+    cluster.run_clustering()

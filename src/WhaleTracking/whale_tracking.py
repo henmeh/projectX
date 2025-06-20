@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.ensemble import IsolationForest
 from datetime import datetime
-from Helper.helperfunctions import create_table, fetch_btc_price, store_data, fetch_data_params, fetch_data
+from Helper.helperfunctions import fetch_btc_price, store_data, fetch_data_params, fetch_data
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -98,11 +98,11 @@ class WhaleTracking:
                         addr = prev_out["scriptPubKey"]["asm"]
                     
                     input_addresses.append(addr)
-                    insert_data = [(current_txid, addr, float(prev_out["value"]))]
+                    insert_data = [(current_txid, addr, float(prev_out["value"]), datetime.now())]
                     
                     execute_values(
                         cursor,
-                        "INSERT INTO transactions_inputs (txid, address, value) VALUES %s",
+                        "INSERT INTO transactions_inputs (txid, address, value, tx_timestamp) VALUES %s",
                         insert_data
                     )
 
@@ -114,11 +114,11 @@ class WhaleTracking:
                     else:
                         addr = script_pubkey["asm"]
                     output_addresses.append(addr)
-                    insert_data = [(current_txid, addr, float(vout["value"]))]
+                    insert_data = [(current_txid, addr, float(vout["value"]), datetime.now())]
                     
                     execute_values(
                         cursor,
-                        "INSERT INTO transactions_outputs (txid, address, value) VALUES %s",
+                        "INSERT INTO transactions_outputs (txid, address, value, tx_timestamp) VALUES %s",
                         insert_data
                     )
             

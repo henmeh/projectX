@@ -59,14 +59,16 @@ CREATE TABLE whale_transactions (
 CREATE TABLE transactions_inputs (
 	txid TEXT,
 	address TEXT,
-	value REAL
+	value REAL,
+	tx_timestamp TIMESTAMP
 	--FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
     ) TABLESPACE mempool;
 	
 CREATE TABLE transactions_outputs (
 	txid TEXT,
 	address TEXT,
-	value REAL
+	value REAL,
+	tx_timestamp TIMESTAMP
 	--FOREIGN KEY(txid) REFERENCES whale_transactions(txid)) TABLESPACE mempool;
 	) TABLESPACE mempool;
 	
@@ -83,3 +85,21 @@ CREATE TABLE whale_behavior (
 	last_updated INTEGER) TABLESPACE mempool;
 
 -- Create Indexes
+
+ALTER TABLE transactions_inputs ADD COLUMN tx_timestamp TIMESTAMP;
+ALTER TABLE transactions_outputs ADD COLUMN tx_timestamp TIMESTAMP;
+
+-- Update existing data
+UPDATE transactions_inputs 
+SET tx_timestamp = (
+    SELECT timestamp 
+    FROM whale_transactions 
+    WHERE whale_transactions.txid = transactions_inputs.txid
+);
+
+UPDATE transactions_outputs 
+SET tx_timestamp = (
+    SELECT timestamp 
+    FROM whale_transactions 
+    WHERE whale_transactions.txid = transactions_outputs.txid
+);
