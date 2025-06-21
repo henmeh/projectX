@@ -1,0 +1,15 @@
+2025-06-21 21:10:31,209 - fee_predictor - INFO - Created model directory: ./models
+2025-06-21 21:10:31,210 - fee_predictor - ERROR - Model file not found: ./models/fee_model_v1.joblib
+2025-06-21 21:10:31,210 - fee_predictor - INFO - No model found. Starting initial training...
+2025-06-21 21:10:31,211 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-21 21:10:31,358 - fee_predictor - INFO - Preprocessing data
+2025-06-21 21:12:04,690 - fee_predictor - INFO - Training models with time-series validation
+2025-06-21 21:12:04,691 - fee_predictor - INFO - Training model for fast_fee
+2025-06-21 21:12:14,917 - fee_predictor - INFO - Training model for medium_fee
+2025-06-21 21:12:22,748 - fee_predictor - INFO - Training model for low_fee
+2025-06-21 21:12:27,297 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-21 21:12:27,297 - fee_predictor - INFO - Training complete. Model version: 1
+2025-06-21 21:12:27,297 - fee_predictor - INFO - fast_fee_future - MAE: 1.67, RMSE: 2.25
+2025-06-21 21:12:27,297 - fee_predictor - INFO - medium_fee_future - MAE: 1.14, RMSE: 1.42
+2025-06-21 21:12:27,297 - fee_predictor - INFO - low_fee_future - MAE: 0.92, RMSE: 1.21
+2025-06-21 21:12:27,297 - fee_predictor - INFO - Training completed in 1.9 minutes
