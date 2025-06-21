@@ -22,13 +22,17 @@ CREATE TABLE mempool_fee_histogram (
     low_fee REAL
 ) TABLESPACE mempool;
 
-CREATE TABLE fee_predictions (
-    id BIGSERIAL PRIMARY KEY,
-    timestamp TIMESTAMP,
-	txid TEXT NOT NULL,
-	alert_type TEXT,
-	amount_btc REAL,
-	amount_usd REAL
+-- Fee Prediction Table
+CREATE TABLE fee_prediction (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    prediction_timestamp TIMESTAMPTZ NOT NULL,
+    model_version INTEGER NOT NULL,
+    fast_fee_pred FLOAT NOT NULL,
+    medium_fee_pred FLOAT NOT NULL,
+    low_fee_pred FLOAT NOT NULL,
+    confidence FLOAT,
+    features JSONB
 ) TABLESPACE mempool;
 
 CREATE TABLE alert_history (
@@ -85,6 +89,11 @@ CREATE TABLE whale_behavior (
 	last_updated INTEGER) TABLESPACE mempool;
 
 -- Create Indexes
+CREATE INDEX idx_fee_histogram_timestamp ON mempool_fee_histogram(timestamp);
+CREATE INDEX idx_fee_prediction_timestamp ON fee_prediction(timestamp);
+CREATE INDEX idx_fee_prediction_model ON fee_prediction(model_version);
+
+
 
 ALTER TABLE transactions_inputs ADD COLUMN tx_timestamp TIMESTAMP;
 ALTER TABLE transactions_outputs ADD COLUMN tx_timestamp TIMESTAMP;
