@@ -2,7 +2,7 @@ set default_tablespace ='';
 
 -- Drop existing tables
 DROP TABLE IF EXISTS public.mempool_fee_histogram CASCADE;
-DROP TABLE IF EXISTS public.fee_predictions CASCADE;
+DROP TABLE IF EXISTS public.fee_prediction CASCADE;
 DROP TABLE IF EXISTS public.alerted_events CASCADE;
 DROP TABLE IF EXISTS public.alert_history CASCADE;
 
@@ -25,14 +25,14 @@ CREATE TABLE mempool_fee_histogram (
 -- Fee Prediction Table
 CREATE TABLE fee_prediction (
     id SERIAL PRIMARY KEY,
-    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    prediction_timestamp TIMESTAMPTZ NOT NULL,
+    --timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    prediction_timestamp TIMESTAMP NOT NULL,
     model_version INTEGER NOT NULL,
     fast_fee_pred FLOAT NOT NULL,
     medium_fee_pred FLOAT NOT NULL,
-    low_fee_pred FLOAT NOT NULL,
-    confidence FLOAT,
-    features JSONB
+    low_fee_pred FLOAT NOT NULL
+    --confidence FLOAT,
+    --features JSONB
 ) TABLESPACE mempool;
 
 CREATE TABLE alert_history (

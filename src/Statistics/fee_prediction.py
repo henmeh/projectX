@@ -17,12 +17,15 @@ import json
 import psutil
 import warnings
 from typing import Tuple, Optional, Dict
+import psycopg2
+from psycopg2.extras import execute_values
+
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 class FeePredictor:
     def __init__(self, db_uri: str, model_path: str = 'fee_model.joblib', 
-                 prediction_horizon: int = 10, retrain_interval: int = 1440):
+                 prediction_horizon: int = 1, retrain_interval: int = 10):
         self.db_uri = db_uri
         self.model_path = model_path
         self.prediction_horizon = prediction_horizon
@@ -38,7 +41,42 @@ class FeePredictor:
         self._ensure_model_dir()
         self.lags = [1, 5, 15, 30, 60]
         self.windows = [15, 30, 60]
+        self.db_params = {
+            "dbname": "bitcoin_blockchain",
+            "user": "postgres",
+            "password": "projectX",
+            "host": "localhost",
+            "port": 5432,
+        }
         
+    def connect_db(self):
+        """Establish connection with optimized settings"""
+        conn = psycopg2.connect(
+            **self.db_params,
+            application_name="BlockchainAnalytics",
+            connect_timeout=10
+        )
+        
+        # Set critical performance parameters
+        with conn.cursor() as cur:
+            try:
+                # Stack depth solution for recursion errors
+                cur.execute("SET max_stack_depth = '7680kB';")
+                
+                # Query optimization flags
+                cur.execute("SET enable_partition_pruning = on;")
+                cur.execute("SET constraint_exclusion = 'partition';")
+                cur.execute("SET work_mem = '64MB';")
+                
+                # Transaction configuration
+                cur.execute("SET idle_in_transaction_session_timeout = '5min';")
+                conn.commit()
+            except psycopg2.Error as e:
+                print(f"Warning: Could not set session parameters: {e}")
+                conn.rollback()
+        
+        return conn
+    
     def _ensure_model_dir(self):
         model_dir = os.path.dirname(self.model_path)
         if model_dir and not os.path.exists(model_dir):
@@ -399,8 +437,8 @@ class FeePredictor:
         # Ensure all required columns are present
         return feature_df[self.feature_columns]
     
-    def predict_fees(self) -> Optional[Dict[str, float]]:
-        if self.last_prediction and (datetime.utcnow() - self.last_prediction['timestamp']).seconds < 60:
+    def predict_fees(self) -> Optional[dict[str, float]]:
+        if self.last_prediction and (datetime.now() - self.last_prediction['timestamp']).seconds < 60:
             return self.last_prediction
         
         if not self.models:
@@ -415,12 +453,12 @@ class FeePredictor:
             
         try:
             prediction = {
-                'timestamp': datetime.utcnow(),
+                'timestamp': datetime.now(),
                 'model_version': self.model_version
             }
             
             for fee_type, model in self.models.items():
-                prediction[f'{fee_type}_fee'] = max(0, model.predict(features)[0])
+                prediction[f'{fee_type}'] = max(0, model.predict(features)[0])
             
             self.last_prediction = prediction
             return prediction
@@ -429,37 +467,26 @@ class FeePredictor:
             return None
     
     def save_prediction(self, prediction: dict) -> bool:
+        """
+        Saves fee prediction in database
+        """
         if not prediction:
             return False
-            
-        # Fixed SQL execution with proper parameter binding
-        sql = text("""
-            INSERT INTO fee_prediction 
-            (timestamp, model_version, fast_fee_pred, medium_fee_pred, low_fee_pred)
-            VALUES (:timestamp, :model_version, :fast_fee, :medium_fee, :low_fee)
-        """)
         
-        params = {
-            'timestamp': prediction['timestamp'],
-            'model_version': prediction['model_version'],
-            'fast_fee': prediction.get('fast_fee', 0),
-            'medium_fee': prediction.get('medium_fee', 0),
-            'low_fee': prediction.get('low_fee', 0)
-        }
-
-        for attempt in range(3):
-            try:
-                with self.engine.connect() as conn:
-                    conn.execute(sql, params)
+        with self.connect_db() as conn:
+            with conn.cursor() as cursor:                
+                try:
+                    cursor.execute(
+                                   """INSERT INTO fee_prediction (prediction_timestamp, model_version, fast_fee_pred, medium_fee_pred, low_fee_pred)
+                                    VALUES (%s, %s, %s, %s, %s)""",
+                                    (prediction["timestamp"], prediction["model_version"], float(prediction["fast_fee"]), float(prediction["medium_fee"]), float(prediction["low_fee"])))
                     conn.commit()
-                self.logger.info("Prediction saved successfully")
-                return True
-            except Exception as e:
-                self.logger.error(f"Save failed (attempt {attempt+1}): {str(e)}")
-                time.sleep(2)
+                    self.logger.info("Prediction saved successfully")
+                    return True
+                except Exception as e:
+                    self.logger.error(f"Save failed: {e}")
+                    return False
                 
-        self.logger.error("Prediction save aborted after 3 attempts")
-        return False
     
     def run_training(self, lookback_days:int = 1) -> bool:
         """
@@ -510,22 +537,23 @@ class FeePredictor:
                     'medium_fee': self.create_model('medium_fee'),
                     'low_fee': self.create_model('low_fee')
                 }
-        """
+        
         # Service lifecycle
         self.logger.info("Starting prediction service")
-        last_training = datetime.utcnow()
-        last_prediction_time = datetime.utcnow()
+        last_training = datetime.now()
+        last_prediction_time = datetime.now()    
         
         while True:
             try:
+        
                 cycle_start = time.time()
-                current_time = datetime.utcnow()
-                
+                current_time = datetime.now()
+
                 # Periodic retraining
                 if (current_time - last_training).total_seconds() >= self.retrain_interval * 60:
                     self.logger.info("Starting periodic retraining")
                     if self.run_training():
-                        last_training = datetime.utcnow()
+                        last_training = datetime.now()
                     else:
                         self.logger.warning("Retraining failed, using existing model")
                 
@@ -533,18 +561,20 @@ class FeePredictor:
                 if (current_time - last_prediction_time).total_seconds() >= self.prediction_horizon * 60:
                     prediction = self.predict_fees()
                     if prediction:
+                        self.logger.info("Successful fee prediction")
                         self.save_prediction(prediction)
                         self.logger.info(
                             f"Prediction: Fast={prediction.get('fast_fee', 0):.1f} | "
                             f"Medium={prediction.get('medium_fee', 0):.1f} | "
                             f"Low={prediction.get('low_fee', 0):.1f}"
                         )
-                    last_prediction_time = current_time
-                
+                        last_prediction_time = current_time
+                    
                 # Dynamic sleep adjustment
                 cycle_time = time.time() - cycle_start
                 sleep_time = max(1, self.prediction_horizon * 60 - cycle_time)
                 time.sleep(sleep_time)
+                #time.sleep(60)
                 
             except KeyboardInterrupt:
                 self.logger.info("Service stopped by user")
@@ -552,13 +582,13 @@ class FeePredictor:
             except Exception as e:
                 self.logger.error(f"Main loop error: {str(e)}")
                 time.sleep(30)  # Cool-down period
-        """
+
 
 if __name__ == "__main__":
     predictor = FeePredictor(
         db_uri="postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain",
         model_path="./models/fee_model_v1.joblib",
-        prediction_horizon=10,
-        retrain_interval=1440  # Daily retraining
+        prediction_horizon=10,#10,
+        retrain_interval=100#1440  # Daily retraining
     )
     predictor.run()

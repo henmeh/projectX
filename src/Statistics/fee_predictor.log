@@ -13,3 +13,178 @@
 2025-06-21 21:12:27,297 - fee_predictor - INFO - medium_fee_future - MAE: 1.14, RMSE: 1.42
 2025-06-21 21:12:27,297 - fee_predictor - INFO - low_fee_future - MAE: 0.92, RMSE: 1.21
 2025-06-21 21:12:27,297 - fee_predictor - INFO - Training completed in 1.9 minutes
+2025-06-22 16:59:25,125 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 16:59:25,135 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:01:21,690 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:01:21,690 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:02:34,773 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:02:55,546 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:02:55,546 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:05:25,352 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:07:11,338 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:07:11,338 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:07:44,369 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:08:01,778 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:08:01,778 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:08:01,778 - fee_predictor - ERROR - Main loop error: module 'time' has no attribute 'slepp'
+2025-06-22 17:08:16,080 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:08:16,080 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:10:51,174 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:15:15,496 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:15:15,496 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:15:15,496 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:16:28,969 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:16:28,970 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:16:28,970 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:16:33,688 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:16:33,692 - fee_predictor - ERROR - Save failed (attempt 1): (psycopg2.errors.NotNullViolation) null value in column "prediction_timestamp" of relation "fee_prediction" violates not-null constraint
+DETAIL:  Failing row contains (10, 2025-06-22 15:16:33.67997+02, null, 1, 0, 0, 0, null, null).
+
+[SQL: 
+            INSERT INTO fee_prediction 
+            (timestamp, model_version, fast_fee_pred, medium_fee_pred, low_fee_pred)
+            VALUES (%(timestamp)s, %(model_version)s, %(fast_fee)s, %(medium_fee)s, %(low_fee)s)
+        ]
+[parameters: {'timestamp': datetime.datetime(2025, 6, 22, 15, 16, 33, 679970), 'model_version': 1, 'fast_fee': 0, 'medium_fee': 0, 'low_fee': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-06-22 17:16:35,696 - fee_predictor - ERROR - Save failed (attempt 2): (psycopg2.errors.NotNullViolation) null value in column "prediction_timestamp" of relation "fee_prediction" violates not-null constraint
+DETAIL:  Failing row contains (11, 2025-06-22 15:16:33.67997+02, null, 1, 0, 0, 0, null, null).
+
+[SQL: 
+            INSERT INTO fee_prediction 
+            (timestamp, model_version, fast_fee_pred, medium_fee_pred, low_fee_pred)
+            VALUES (%(timestamp)s, %(model_version)s, %(fast_fee)s, %(medium_fee)s, %(low_fee)s)
+        ]
+[parameters: {'timestamp': datetime.datetime(2025, 6, 22, 15, 16, 33, 679970), 'model_version': 1, 'fast_fee': 0, 'medium_fee': 0, 'low_fee': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-06-22 17:16:37,711 - fee_predictor - ERROR - Save failed (attempt 3): (psycopg2.errors.NotNullViolation) null value in column "prediction_timestamp" of relation "fee_prediction" violates not-null constraint
+DETAIL:  Failing row contains (12, 2025-06-22 15:16:33.67997+02, null, 1, 0, 0, 0, null, null).
+
+[SQL: 
+            INSERT INTO fee_prediction 
+            (timestamp, model_version, fast_fee_pred, medium_fee_pred, low_fee_pred)
+            VALUES (%(timestamp)s, %(model_version)s, %(fast_fee)s, %(medium_fee)s, %(low_fee)s)
+        ]
+[parameters: {'timestamp': datetime.datetime(2025, 6, 22, 15, 16, 33, 679970), 'model_version': 1, 'fast_fee': 0, 'medium_fee': 0, 'low_fee': 0}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-06-22 17:16:39,714 - fee_predictor - ERROR - Prediction save aborted after 3 attempts
+2025-06-22 17:16:39,715 - fee_predictor - INFO - Prediction: Fast=0.0 | Medium=0.0 | Low=0.0
+2025-06-22 17:20:47,708 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:20:47,709 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:20:47,709 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:20:52,387 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:20:52,388 - fee_predictor - INFO - Prediction: Fast=0.0 | Medium=0.0 | Low=0.0
+2025-06-22 17:24:13,496 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:24:13,503 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:24:13,503 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:24:18,664 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:24:18,664 - fee_predictor - INFO - Prediction: Fast=2.3 | Medium=1.2 | Low=1.0
+2025-06-22 17:34:04,028 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:34:04,028 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:34:04,028 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:34:08,691 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:37:07,824 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:37:07,824 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:37:07,824 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:37:13,277 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:37:27,265 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:37:27,265 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:37:27,265 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:37:32,532 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:37:32,542 - fee_predictor - ERROR - Save failed: 'psycopg2.extensions.cursor' object has no attribute 'execute_values'
+2025-06-22 17:37:32,542 - fee_predictor - INFO - Prediction: Fast=1.9 | Medium=1.3 | Low=0.7
+2025-06-22 17:38:26,422 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:38:26,422 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:38:26,422 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:38:31,577 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:38:31,587 - fee_predictor - ERROR - Save failed: execute_values() missing 1 required positional argument: 'argslist'
+2025-06-22 17:38:31,587 - fee_predictor - INFO - Prediction: Fast=1.7 | Medium=0.5 | Low=0.6
+2025-06-22 17:40:57,469 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:40:57,469 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:40:57,469 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:41:02,603 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:41:02,612 - fee_predictor - ERROR - Save failed: execute_values() missing 1 required positional argument: 'argslist'
+2025-06-22 17:41:02,612 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=0.9 | Low=0.7
+2025-06-22 17:42:07,654 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:42:07,654 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:42:07,654 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:42:12,979 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:42:12,998 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:42:12,998 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=0.9 | Low=0.7
+2025-06-22 17:42:50,275 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:42:50,275 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:42:50,276 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:42:55,036 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:42:55,046 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:42:55,046 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=0.9 | Low=0.7
+2025-06-22 17:43:17,344 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:43:17,344 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:43:17,344 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:43:22,010 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:43:22,021 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:43:22,022 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=0.9 | Low=0.7
+2025-06-22 17:44:22,660 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:44:22,660 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:44:22,660 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:44:28,006 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:44:28,021 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:44:28,021 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=1.2 | Low=1.4
+2025-06-22 17:45:10,673 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:45:10,673 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:45:10,673 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:45:15,968 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:45:15,978 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:45:15,978 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=1.2 | Low=1.4
+2025-06-22 17:47:10,757 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:47:10,757 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:47:10,757 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:47:15,989 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:47:16,002 - fee_predictor - ERROR - Save failed: object of type 'datetime.datetime' has no len()
+2025-06-22 17:47:16,002 - fee_predictor - INFO - Prediction: Fast=2.3 | Medium=0.9 | Low=1.4
+2025-06-22 17:48:33,351 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:48:33,351 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:48:33,352 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:48:38,305 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:48:38,315 - fee_predictor - ERROR - Save failed: syntax error at or near "INOT"
+LINE 1: INSERT INOT fee_prediction (prediction_timestamp, model_vers...
+               ^
+
+2025-06-22 17:48:38,316 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=1.2 | Low=1.2
+2025-06-22 17:48:51,289 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:48:51,290 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:48:51,291 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:48:56,589 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:48:56,600 - fee_predictor - ERROR - Save failed: schema "np" does not exist
+LINE 2: ...LUES ('2025-06-22T17:48:56.581003'::timestamp, 1, np.float64...
+                                                             ^
+
+2025-06-22 17:48:56,600 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=1.2 | Low=1.2
+2025-06-22 17:50:19,736 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:50:19,736 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:50:19,736 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:50:24,585 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:50:24,610 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 17:50:24,610 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=2.1 | Low=0.9
+2025-06-22 17:53:42,955 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:53:42,956 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:56:56,059 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:57:15,035 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:57:15,036 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:57:48,611 - fee_predictor - INFO - Service stopped by user
+2025-06-22 17:58:20,666 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 17:58:20,666 - fee_predictor - INFO - Starting prediction service
+2025-06-22 17:59:20,727 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 17:59:25,558 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 17:59:25,587 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 17:59:25,588 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=1.1 | Low=1.0
+2025-06-22 18:00:25,647 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:00:25,754 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:00:25,771 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:00:25,771 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=1.1 | Low=1.1
+2025-06-22 18:01:25,808 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:01:25,867 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:01:25,885 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:01:25,885 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=1.1 | Low=1.1
+2025-06-22 18:01:42,145 - fee_predictor - INFO - Service stopped by user
+2025-06-22 18:02:33,793 - fee_predictor - INFO - Loaded model version 1
+2025-06-22 18:02:33,793 - fee_predictor - INFO - Starting prediction service

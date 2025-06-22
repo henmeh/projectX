@@ -236,7 +236,7 @@ class BlockchainStoring:
                 results = cursor.fetchall()
                 balance = 0
                 for result in results:
-                    balance += result[0] 
+                    balance += result[0]
                 return balance
 
 
