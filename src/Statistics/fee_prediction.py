@@ -19,6 +19,7 @@ import warnings
 from typing import Tuple, Optional, Dict
 import psycopg2
 from psycopg2.extras import execute_values
+import ast
 
 
 warnings.filterwarnings("ignore", category=FutureWarning)

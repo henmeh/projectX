@@ -188,3 +188,460 @@ LINE 2: ...LUES ('2025-06-22T17:48:56.581003'::timestamp, 1, np.float64...
 2025-06-22 18:01:42,145 - fee_predictor - INFO - Service stopped by user
 2025-06-22 18:02:33,793 - fee_predictor - INFO - Loaded model version 1
 2025-06-22 18:02:33,793 - fee_predictor - INFO - Starting prediction service
+2025-06-22 18:12:33,891 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:12:40,215 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:12:40,246 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:12:40,246 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=1.5 | Low=1.2
+2025-06-22 18:22:33,990 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:22:34,950 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:22:34,984 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:22:34,984 - fee_predictor - INFO - Prediction: Fast=1.8 | Medium=2.3 | Low=0.7
+2025-06-22 18:32:34,035 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:32:34,679 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:32:34,699 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:32:34,699 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=1.5 | Low=0.8
+2025-06-22 18:42:34,134 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:42:34,983 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:42:35,012 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:42:35,012 - fee_predictor - INFO - Prediction: Fast=3.2 | Medium=2.0 | Low=0.9
+2025-06-22 18:52:34,166 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 18:52:34,923 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 18:52:34,948 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 18:52:34,949 - fee_predictor - INFO - Prediction: Fast=2.1 | Medium=2.0 | Low=1.0
+2025-06-22 19:02:34,266 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:02:35,129 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:02:35,157 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:02:35,158 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=0.9 | Low=1.1
+2025-06-22 19:12:34,362 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:12:34,776 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:12:34,801 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:12:34,801 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=0.9 | Low=1.3
+2025-06-22 19:22:34,462 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:22:34,915 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:22:34,941 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:22:34,941 - fee_predictor - INFO - Prediction: Fast=2.7 | Medium=0.8 | Low=1.1
+2025-06-22 19:32:34,563 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:32:35,689 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:32:35,716 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:32:35,716 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=2.1 | Low=0.8
+2025-06-22 19:42:34,656 - fee_predictor - INFO - Starting periodic retraining
+2025-06-22 19:42:34,677 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-22 19:42:34,850 - fee_predictor - INFO - Preprocessing data
+2025-06-22 19:43:28,336 - fee_predictor - INFO - Training models with time-series validation
+2025-06-22 19:43:28,337 - fee_predictor - INFO - Training model for fast_fee
+2025-06-22 19:43:40,122 - fee_predictor - INFO - Training model for medium_fee
+2025-06-22 19:43:47,472 - fee_predictor - INFO - Training model for low_fee
+2025-06-22 19:43:52,333 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-22 19:43:52,334 - fee_predictor - INFO - Training complete. Model version: 1
+2025-06-22 19:43:52,334 - fee_predictor - INFO - fast_fee_future - MAE: 2.76, RMSE: 4.26
+2025-06-22 19:43:52,335 - fee_predictor - INFO - medium_fee_future - MAE: 1.67, RMSE: 2.17
+2025-06-22 19:43:52,335 - fee_predictor - INFO - low_fee_future - MAE: 1.18, RMSE: 1.51
+2025-06-22 19:43:52,335 - fee_predictor - INFO - Training completed in 1.3 minutes
+2025-06-22 19:43:52,335 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:43:52,477 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:43:52,506 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:43:52,507 - fee_predictor - INFO - Prediction: Fast=2.9 | Medium=1.7 | Low=0.5
+2025-06-22 19:52:34,660 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 19:52:35,081 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 19:52:35,102 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 19:52:35,103 - fee_predictor - INFO - Prediction: Fast=1.3 | Medium=0.5 | Low=0.5
+2025-06-22 20:02:34,759 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:02:35,813 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:02:35,891 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:02:35,892 - fee_predictor - INFO - Prediction: Fast=1.6 | Medium=1.1 | Low=0.6
+2025-06-22 20:12:34,859 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:12:35,829 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:12:35,850 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:12:35,850 - fee_predictor - INFO - Prediction: Fast=1.6 | Medium=1.7 | Low=0.3
+2025-06-22 20:22:34,958 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:22:35,174 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:22:35,216 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:22:35,216 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=1.2 | Low=0.4
+2025-06-22 20:32:35,028 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:32:35,421 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:32:35,444 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:32:35,445 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=1.8 | Low=0.9
+2025-06-22 20:42:35,128 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:42:36,307 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:42:36,332 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:42:36,334 - fee_predictor - INFO - Prediction: Fast=3.2 | Medium=2.6 | Low=1.9
+2025-06-22 20:52:35,209 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 20:52:36,258 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 20:52:36,299 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 20:52:36,300 - fee_predictor - INFO - Prediction: Fast=12.2 | Medium=7.4 | Low=4.5
+2025-06-22 21:02:35,294 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:02:35,987 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:02:36,007 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:02:36,007 - fee_predictor - INFO - Prediction: Fast=3.1 | Medium=3.6 | Low=3.1
+2025-06-22 21:12:35,391 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:12:35,771 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:12:35,815 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:12:35,815 - fee_predictor - INFO - Prediction: Fast=3.4 | Medium=3.6 | Low=1.9
+2025-06-22 21:22:35,469 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:22:36,055 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:22:36,076 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:22:36,076 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=1.0 | Low=0.8
+2025-06-22 21:32:35,505 - fee_predictor - INFO - Starting periodic retraining
+2025-06-22 21:32:35,508 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-22 21:32:35,724 - fee_predictor - INFO - Preprocessing data
+2025-06-22 21:32:36,267 - fee_predictor - INFO - Training models with time-series validation
+2025-06-22 21:32:36,268 - fee_predictor - INFO - Training model for fast_fee
+2025-06-22 21:32:48,887 - fee_predictor - INFO - Training model for medium_fee
+2025-06-22 21:32:55,980 - fee_predictor - INFO - Training model for low_fee
+2025-06-22 21:33:00,795 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-22 21:33:00,795 - fee_predictor - INFO - Training complete. Model version: 2
+2025-06-22 21:33:00,795 - fee_predictor - INFO - fast_fee_future - MAE: 4.68, RMSE: 6.64
+2025-06-22 21:33:00,796 - fee_predictor - INFO - medium_fee_future - MAE: 1.70, RMSE: 2.24
+2025-06-22 21:33:00,796 - fee_predictor - INFO - low_fee_future - MAE: 1.04, RMSE: 1.34
+2025-06-22 21:33:00,796 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-22 21:33:00,796 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:33:00,917 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:33:00,944 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:33:00,945 - fee_predictor - INFO - Prediction: Fast=4.3 | Medium=2.9 | Low=2.1
+2025-06-22 21:42:35,543 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:42:36,685 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:42:36,718 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:42:36,719 - fee_predictor - INFO - Prediction: Fast=3.6 | Medium=2.7 | Low=2.1
+2025-06-22 21:52:35,641 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 21:52:35,982 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 21:52:36,001 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 21:52:36,021 - fee_predictor - INFO - Prediction: Fast=3.7 | Medium=2.8 | Low=1.5
+2025-06-22 22:02:35,739 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:02:36,423 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:02:36,447 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:02:36,448 - fee_predictor - INFO - Prediction: Fast=4.4 | Medium=3.0 | Low=2.1
+2025-06-22 22:12:35,804 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:12:37,089 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:12:37,126 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:12:37,126 - fee_predictor - INFO - Prediction: Fast=2.7 | Medium=0.7 | Low=1.2
+2025-06-22 22:22:35,903 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:22:36,589 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:22:36,609 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:22:36,609 - fee_predictor - INFO - Prediction: Fast=7.5 | Medium=6.7 | Low=1.8
+2025-06-22 22:32:35,984 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:32:37,022 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:32:37,056 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:32:37,057 - fee_predictor - INFO - Prediction: Fast=1.5 | Medium=1.9 | Low=1.2
+2025-06-22 22:42:36,071 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:42:37,110 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:42:37,141 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:42:37,142 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=0.8 | Low=0.2
+2025-06-22 22:52:36,112 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 22:52:36,845 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 22:52:36,875 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 22:52:36,876 - fee_predictor - INFO - Prediction: Fast=1.8 | Medium=1.6 | Low=1.4
+2025-06-22 23:02:36,204 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:02:36,389 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:02:36,412 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:02:36,412 - fee_predictor - INFO - Prediction: Fast=6.7 | Medium=3.1 | Low=3.7
+2025-06-22 23:12:36,304 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:12:37,734 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:12:37,773 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:12:37,791 - fee_predictor - INFO - Prediction: Fast=7.8 | Medium=2.7 | Low=3.9
+2025-06-22 23:22:36,314 - fee_predictor - INFO - Starting periodic retraining
+2025-06-22 23:22:36,317 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-22 23:22:36,561 - fee_predictor - INFO - Preprocessing data
+2025-06-22 23:22:36,909 - fee_predictor - INFO - Training models with time-series validation
+2025-06-22 23:22:36,910 - fee_predictor - INFO - Training model for fast_fee
+2025-06-22 23:22:49,104 - fee_predictor - INFO - Training model for medium_fee
+2025-06-22 23:22:56,161 - fee_predictor - INFO - Training model for low_fee
+2025-06-22 23:23:00,571 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-22 23:23:00,572 - fee_predictor - INFO - Training complete. Model version: 3
+2025-06-22 23:23:00,572 - fee_predictor - INFO - fast_fee_future - MAE: 2.51, RMSE: 3.31
+2025-06-22 23:23:00,572 - fee_predictor - INFO - medium_fee_future - MAE: 1.80, RMSE: 2.25
+2025-06-22 23:23:00,572 - fee_predictor - INFO - low_fee_future - MAE: 0.98, RMSE: 1.20
+2025-06-22 23:23:00,572 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-22 23:23:00,573 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:23:00,677 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:23:00,695 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:23:00,696 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=1.9 | Low=1.4
+2025-06-22 23:32:36,414 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:32:37,201 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:32:37,230 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:32:37,230 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=1.9 | Low=0.8
+2025-06-22 23:42:36,514 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:42:37,067 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:42:37,095 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:42:37,096 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=3.2 | Low=1.5
+2025-06-22 23:52:36,614 - fee_predictor - INFO - Preparing real-time features
+2025-06-22 23:52:37,500 - fee_predictor - INFO - Successful fee prediction
+2025-06-22 23:52:37,530 - fee_predictor - INFO - Prediction saved successfully
+2025-06-22 23:52:37,531 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=3.0 | Low=1.0
+2025-06-23 00:02:36,675 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:02:36,921 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:02:36,943 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:02:36,944 - fee_predictor - INFO - Prediction: Fast=3.5 | Medium=9.6 | Low=1.8
+2025-06-23 00:12:36,774 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:12:37,575 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:12:37,597 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:12:37,598 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=9.0 | Low=1.6
+2025-06-23 00:22:36,856 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:22:37,431 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:22:37,475 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:22:37,475 - fee_predictor - INFO - Prediction: Fast=2.9 | Medium=9.4 | Low=1.8
+2025-06-23 00:32:36,954 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:32:37,006 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:32:37,021 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:32:37,021 - fee_predictor - INFO - Prediction: Fast=3.8 | Medium=9.2 | Low=2.1
+2025-06-23 00:42:37,054 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:42:37,421 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:42:37,441 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:42:37,441 - fee_predictor - INFO - Prediction: Fast=3.4 | Medium=9.6 | Low=1.4
+2025-06-23 00:52:37,155 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 00:52:38,388 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 00:52:38,405 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 00:52:38,406 - fee_predictor - INFO - Prediction: Fast=3.1 | Medium=8.1 | Low=2.0
+2025-06-23 01:02:37,245 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:02:38,479 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:02:38,514 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:02:38,515 - fee_predictor - INFO - Prediction: Fast=3.5 | Medium=2.3 | Low=1.6
+2025-06-23 01:12:37,308 - fee_predictor - INFO - Starting periodic retraining
+2025-06-23 01:12:37,374 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-23 01:12:37,989 - fee_predictor - INFO - Preprocessing data
+2025-06-23 01:12:38,525 - fee_predictor - INFO - Training models with time-series validation
+2025-06-23 01:12:38,525 - fee_predictor - INFO - Training model for fast_fee
+2025-06-23 01:12:50,214 - fee_predictor - INFO - Training model for medium_fee
+2025-06-23 01:12:57,274 - fee_predictor - INFO - Training model for low_fee
+2025-06-23 01:13:01,749 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-23 01:13:01,750 - fee_predictor - INFO - Training complete. Model version: 4
+2025-06-23 01:13:01,750 - fee_predictor - INFO - fast_fee_future - MAE: 2.28, RMSE: 3.10
+2025-06-23 01:13:01,750 - fee_predictor - INFO - medium_fee_future - MAE: 1.27, RMSE: 1.59
+2025-06-23 01:13:01,752 - fee_predictor - INFO - low_fee_future - MAE: 1.06, RMSE: 1.31
+2025-06-23 01:13:01,752 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-23 01:13:01,752 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:13:01,875 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:13:01,908 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:13:01,910 - fee_predictor - INFO - Prediction: Fast=1.6 | Medium=1.4 | Low=0.6
+2025-06-23 01:22:37,406 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:22:37,952 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:22:37,986 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:22:37,987 - fee_predictor - INFO - Prediction: Fast=2.2 | Medium=2.2 | Low=1.5
+2025-06-23 01:32:37,507 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:32:38,538 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:32:38,575 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:32:38,576 - fee_predictor - INFO - Prediction: Fast=1.7 | Medium=1.7 | Low=1.2
+2025-06-23 01:42:37,537 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:42:37,962 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:42:38,015 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:42:38,016 - fee_predictor - INFO - Prediction: Fast=2.1 | Medium=2.3 | Low=1.1
+2025-06-23 01:52:37,636 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 01:52:38,665 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 01:52:38,690 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 01:52:38,690 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=2.9 | Low=1.5
+2025-06-23 02:02:37,734 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:02:38,088 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:02:38,142 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:02:38,143 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=1.5 | Low=1.8
+2025-06-23 02:12:37,836 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:12:38,773 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:12:38,794 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:12:38,795 - fee_predictor - INFO - Prediction: Fast=1.6 | Medium=1.3 | Low=1.5
+2025-06-23 02:22:37,934 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:22:38,469 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:22:38,496 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:22:38,497 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=2.2 | Low=1.6
+2025-06-23 02:32:38,034 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:32:38,176 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:32:38,199 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:32:38,200 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=2.1 | Low=1.2
+2025-06-23 02:42:38,119 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:42:38,549 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:42:38,586 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:42:38,586 - fee_predictor - INFO - Prediction: Fast=1.7 | Medium=2.4 | Low=1.7
+2025-06-23 02:52:38,178 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 02:52:39,287 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 02:52:39,320 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 02:52:39,321 - fee_predictor - INFO - Prediction: Fast=2.1 | Medium=2.0 | Low=2.0
+2025-06-23 03:02:38,226 - fee_predictor - INFO - Starting periodic retraining
+2025-06-23 03:02:38,228 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-23 03:02:38,264 - fee_predictor - INFO - Preprocessing data
+2025-06-23 03:02:38,369 - fee_predictor - INFO - Training models with time-series validation
+2025-06-23 03:02:38,378 - fee_predictor - INFO - Training model for fast_fee
+2025-06-23 03:02:49,575 - fee_predictor - INFO - Training model for medium_fee
+2025-06-23 03:02:56,448 - fee_predictor - INFO - Training model for low_fee
+2025-06-23 03:03:00,803 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-23 03:03:00,803 - fee_predictor - INFO - Training complete. Model version: 5
+2025-06-23 03:03:00,803 - fee_predictor - INFO - fast_fee_future - MAE: 1.80, RMSE: 2.51
+2025-06-23 03:03:00,804 - fee_predictor - INFO - medium_fee_future - MAE: 1.31, RMSE: 1.62
+2025-06-23 03:03:00,804 - fee_predictor - INFO - low_fee_future - MAE: 1.01, RMSE: 1.27
+2025-06-23 03:03:00,804 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-23 03:03:00,804 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:03:00,836 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:03:00,855 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:03:00,856 - fee_predictor - INFO - Prediction: Fast=3.1 | Medium=3.0 | Low=1.9
+2025-06-23 03:12:38,304 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:12:38,756 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:12:38,787 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:12:38,787 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=2.3 | Low=1.8
+2025-06-23 03:22:38,352 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:22:39,112 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:22:39,144 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:22:39,144 - fee_predictor - INFO - Prediction: Fast=2.9 | Medium=2.5 | Low=1.5
+2025-06-23 03:32:38,450 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:32:38,572 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:32:38,593 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:32:38,593 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=3.2 | Low=1.8
+2025-06-23 03:42:38,551 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:42:39,333 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:42:39,361 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:42:39,361 - fee_predictor - INFO - Prediction: Fast=2.9 | Medium=2.5 | Low=1.9
+2025-06-23 03:52:38,607 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 03:52:39,682 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 03:52:39,782 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 03:52:39,782 - fee_predictor - INFO - Prediction: Fast=3.1 | Medium=3.0 | Low=2.2
+2025-06-23 04:02:38,681 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:02:38,831 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:02:38,853 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:02:38,853 - fee_predictor - INFO - Prediction: Fast=5.5 | Medium=3.5 | Low=1.6
+2025-06-23 04:12:38,779 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:12:39,265 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:12:39,296 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:12:39,296 - fee_predictor - INFO - Prediction: Fast=6.0 | Medium=2.8 | Low=1.4
+2025-06-23 04:22:38,879 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:22:39,890 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:22:39,922 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:22:39,922 - fee_predictor - INFO - Prediction: Fast=5.3 | Medium=4.0 | Low=1.9
+2025-06-23 04:32:38,978 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:32:39,220 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:32:39,242 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:32:39,243 - fee_predictor - INFO - Prediction: Fast=5.5 | Medium=2.2 | Low=1.3
+2025-06-23 04:42:38,994 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:42:39,955 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:42:40,002 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:42:40,002 - fee_predictor - INFO - Prediction: Fast=5.4 | Medium=2.5 | Low=2.0
+2025-06-23 04:52:39,090 - fee_predictor - INFO - Starting periodic retraining
+2025-06-23 04:52:39,092 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-23 04:52:39,329 - fee_predictor - INFO - Preprocessing data
+2025-06-23 04:52:39,668 - fee_predictor - INFO - Training models with time-series validation
+2025-06-23 04:52:39,668 - fee_predictor - INFO - Training model for fast_fee
+2025-06-23 04:52:51,285 - fee_predictor - INFO - Training model for medium_fee
+2025-06-23 04:52:58,171 - fee_predictor - INFO - Training model for low_fee
+2025-06-23 04:53:02,371 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-23 04:53:02,371 - fee_predictor - INFO - Training complete. Model version: 6
+2025-06-23 04:53:02,372 - fee_predictor - INFO - fast_fee_future - MAE: 2.12, RMSE: 2.70
+2025-06-23 04:53:02,372 - fee_predictor - INFO - medium_fee_future - MAE: 1.52, RMSE: 1.83
+2025-06-23 04:53:02,372 - fee_predictor - INFO - low_fee_future - MAE: 1.09, RMSE: 1.30
+2025-06-23 04:53:02,372 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-23 04:53:02,373 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 04:53:02,452 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 04:53:02,491 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 04:53:02,491 - fee_predictor - INFO - Prediction: Fast=3.6 | Medium=1.6 | Low=1.7
+2025-06-23 05:02:39,190 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:02:39,505 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:02:39,526 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:02:39,526 - fee_predictor - INFO - Prediction: Fast=4.8 | Medium=3.2 | Low=1.1
+2025-06-23 05:12:39,217 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:12:40,171 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:12:40,219 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:12:40,220 - fee_predictor - INFO - Prediction: Fast=2.0 | Medium=2.3 | Low=0.9
+2025-06-23 05:22:39,316 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:22:40,302 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:22:40,323 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:22:40,323 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=2.9 | Low=1.3
+2025-06-23 05:32:39,365 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:32:40,348 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:32:40,382 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:32:40,382 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=3.3 | Low=1.6
+2025-06-23 05:42:39,458 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:42:39,936 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:42:39,956 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:42:39,957 - fee_predictor - INFO - Prediction: Fast=3.0 | Medium=1.4 | Low=1.6
+2025-06-23 05:52:39,502 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 05:52:40,588 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 05:52:40,610 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 05:52:40,610 - fee_predictor - INFO - Prediction: Fast=2.9 | Medium=3.1 | Low=2.0
+2025-06-23 06:02:39,603 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:02:40,818 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:02:40,850 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:02:40,851 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=2.3 | Low=1.6
+2025-06-23 06:12:39,702 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:12:40,244 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:12:40,323 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:12:40,323 - fee_predictor - INFO - Prediction: Fast=3.6 | Medium=2.1 | Low=1.0
+2025-06-23 06:22:39,802 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:22:40,451 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:22:40,472 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:22:40,472 - fee_predictor - INFO - Prediction: Fast=3.3 | Medium=3.1 | Low=1.0
+2025-06-23 06:32:39,879 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:32:40,632 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:32:40,675 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:32:40,675 - fee_predictor - INFO - Prediction: Fast=1.8 | Medium=1.9 | Low=1.7
+2025-06-23 06:42:39,978 - fee_predictor - INFO - Starting periodic retraining
+2025-06-23 06:42:39,980 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-23 06:42:40,011 - fee_predictor - INFO - Preprocessing data
+2025-06-23 06:42:40,602 - fee_predictor - INFO - Training models with time-series validation
+2025-06-23 06:42:40,603 - fee_predictor - INFO - Training model for fast_fee
+2025-06-23 06:42:52,309 - fee_predictor - INFO - Training model for medium_fee
+2025-06-23 06:42:59,888 - fee_predictor - INFO - Training model for low_fee
+2025-06-23 06:43:03,948 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-23 06:43:03,948 - fee_predictor - INFO - Training complete. Model version: 7
+2025-06-23 06:43:03,948 - fee_predictor - INFO - fast_fee_future - MAE: 1.87, RMSE: 2.55
+2025-06-23 06:43:03,948 - fee_predictor - INFO - medium_fee_future - MAE: 1.34, RMSE: 1.60
+2025-06-23 06:43:03,949 - fee_predictor - INFO - low_fee_future - MAE: 0.89, RMSE: 1.17
+2025-06-23 06:43:03,949 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-23 06:43:03,949 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:43:04,062 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:43:04,082 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:43:04,084 - fee_predictor - INFO - Prediction: Fast=4.9 | Medium=1.7 | Low=1.1
+2025-06-23 06:52:40,078 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 06:52:41,054 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 06:52:41,074 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 06:52:41,075 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=1.2 | Low=1.2
+2025-06-23 07:02:40,168 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:02:40,688 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:02:40,710 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:02:40,710 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=1.8 | Low=1.2
+2025-06-23 07:12:40,178 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:12:40,576 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:12:40,680 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:12:40,681 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=2.0 | Low=1.3
+2025-06-23 07:22:40,199 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:22:40,534 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:22:40,549 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:22:40,549 - fee_predictor - INFO - Prediction: Fast=5.3 | Medium=1.7 | Low=1.2
+2025-06-23 07:32:40,270 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:32:40,972 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:32:40,991 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:32:40,991 - fee_predictor - INFO - Prediction: Fast=2.4 | Medium=1.0 | Low=1.0
+2025-06-23 07:42:40,370 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:42:41,022 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:42:41,042 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:42:41,063 - fee_predictor - INFO - Prediction: Fast=2.1 | Medium=1.6 | Low=0.9
+2025-06-23 07:52:40,415 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 07:52:42,154 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 07:52:42,174 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 07:52:42,174 - fee_predictor - INFO - Prediction: Fast=4.1 | Medium=2.5 | Low=1.0
+2025-06-23 08:02:40,516 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 08:02:43,338 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 08:02:43,358 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 08:02:43,359 - fee_predictor - INFO - Prediction: Fast=4.0 | Medium=2.3 | Low=1.6
+2025-06-23 08:12:40,614 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 08:12:41,707 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 08:12:41,729 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 08:12:41,729 - fee_predictor - INFO - Prediction: Fast=3.2 | Medium=2.8 | Low=0.6
+2025-06-23 08:22:40,675 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 08:22:41,206 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 08:22:41,229 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 08:22:41,229 - fee_predictor - INFO - Prediction: Fast=3.6 | Medium=2.4 | Low=0.2
+2025-06-23 08:32:40,775 - fee_predictor - INFO - Starting periodic retraining
+2025-06-23 08:32:40,790 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-23 08:32:41,271 - fee_predictor - INFO - Preprocessing data
+2025-06-23 08:32:41,982 - fee_predictor - INFO - Training models with time-series validation
+2025-06-23 08:32:41,983 - fee_predictor - INFO - Training model for fast_fee
+2025-06-23 08:32:54,329 - fee_predictor - INFO - Training model for medium_fee
+2025-06-23 08:33:02,482 - fee_predictor - INFO - Training model for low_fee
+2025-06-23 08:33:06,761 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-23 08:33:06,762 - fee_predictor - INFO - Training complete. Model version: 8
+2025-06-23 08:33:06,762 - fee_predictor - INFO - fast_fee_future - MAE: 2.14, RMSE: 2.75
+2025-06-23 08:33:06,762 - fee_predictor - INFO - medium_fee_future - MAE: 1.31, RMSE: 1.57
+2025-06-23 08:33:06,763 - fee_predictor - INFO - low_fee_future - MAE: 1.07, RMSE: 1.32
+2025-06-23 08:33:06,763 - fee_predictor - INFO - Training completed in 0.4 minutes
+2025-06-23 08:33:06,763 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 08:33:06,857 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 08:33:06,879 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 08:33:06,879 - fee_predictor - INFO - Prediction: Fast=4.3 | Medium=2.0 | Low=2.4
+2025-06-23 08:42:40,874 - fee_predictor - INFO - Preparing real-time features
+2025-06-23 08:42:41,521 - fee_predictor - INFO - Successful fee prediction
+2025-06-23 08:42:41,541 - fee_predictor - INFO - Prediction saved successfully
+2025-06-23 08:42:41,541 - fee_predictor - INFO - Prediction: Fast=4.2 | Medium=2.2 | Low=2.0
+2025-06-23 08:47:50,810 - fee_predictor - INFO - Service stopped by user
