@@ -18,7 +18,8 @@ const Topbar = () => {
     toggleSidebar, 
     sidebarCollapsed, 
     isLoggedIn, 
-    setLoginVisible 
+    setLoginVisible,
+    isMobile
   } = useAppContext();
   
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -49,15 +50,20 @@ const Topbar = () => {
     }
   ];
 
+  // Only show toggle button on mobile
+  const showToggleButton = isMobile;
+
   return (
     <Header className={`topbar ${darkMode ? 'dark' : 'light'}`}>
       <div className="topbar-left">
-        <Button
-          type="text"
-          icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          onClick={toggleSidebar}
-          className="menu-toggle"
-        />
+        {showToggleButton && (
+          <Button
+            type="text"
+            icon={sidebarCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={toggleSidebar}
+            className="menu-toggle"
+          />
+        )}
         <div className="app-name">Bitcoin Analytics Dashboard</div>
       </div>
       

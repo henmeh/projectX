@@ -671,3 +671,32 @@ LINE 2: ...LUES ('2025-06-22T17:48:56.581003'::timestamp, 1, np.float64...
 2025-06-28 14:56:13,276 - fee_predictor - INFO - Successful fee prediction
 2025-06-28 14:56:13,299 - fee_predictor - INFO - Prediction saved successfully
 2025-06-28 14:56:13,300 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=1.9 | Low=1.4
+2025-06-28 15:06:12,023 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 15:06:13,147 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 15:06:13,169 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 15:06:13,169 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=0.6 | Low=0.5
+2025-06-28 15:16:12,103 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 15:16:14,353 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 15:16:14,371 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 15:16:14,372 - fee_predictor - INFO - Prediction: Fast=1.3 | Medium=2.7 | Low=2.2
+2025-06-28 15:26:12,203 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 15:26:13,987 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 15:26:14,005 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 15:26:14,005 - fee_predictor - INFO - Prediction: Fast=2.6 | Medium=2.5 | Low=2.6
+2025-06-28 15:36:12,303 - fee_predictor - INFO - Starting periodic retraining
+2025-06-28 15:36:12,314 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-28 15:36:12,458 - fee_predictor - INFO - Preprocessing data
+2025-06-28 15:41:59,651 - fee_predictor - INFO - Training models with time-series validation
+2025-06-28 15:41:59,656 - fee_predictor - INFO - Training model for fast_fee
+2025-06-28 15:42:11,432 - fee_predictor - INFO - Training model for medium_fee
+2025-06-28 15:42:18,772 - fee_predictor - INFO - Training model for low_fee
+2025-06-28 15:42:23,149 - fee_predictor - INFO - Model saved to ./models/fee_model_v1.joblib
+2025-06-28 15:42:23,149 - fee_predictor - INFO - Training complete. Model version: 8
+2025-06-28 15:42:23,150 - fee_predictor - INFO - fast_fee_future - MAE: 1.92, RMSE: 2.37
+2025-06-28 15:42:23,150 - fee_predictor - INFO - medium_fee_future - MAE: 1.89, RMSE: 2.14
+2025-06-28 15:42:23,150 - fee_predictor - INFO - low_fee_future - MAE: 1.34, RMSE: 1.62
+2025-06-28 15:42:23,150 - fee_predictor - INFO - Training completed in 6.2 minutes
+2025-06-28 15:42:23,150 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 15:42:24,512 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 15:42:24,537 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 15:42:24,538 - fee_predictor - INFO - Prediction: Fast=2.5 | Medium=3.2 | Low=3.9
