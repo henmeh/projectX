@@ -113,7 +113,7 @@ def read_root():
     return {
         "message": "Bitcoin Analytics API",
         "status": "operational",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "endpoints": [
             "/whale-transactions",
             "/fee-estimation",

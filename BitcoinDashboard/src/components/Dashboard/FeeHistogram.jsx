@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bar } from "@ant-design/plots";
-import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolCongestion } from "../utils/api";
+import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolCongestion } from "../../utils/api";
 import { Card, Spin, Typography } from "antd";
 
 const { Text } = Typography;

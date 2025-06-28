@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Table, Tooltip } from "antd";
-import { fetchWhaleTransactions } from "../utils/api";
+import { fetchWhaleTransactions } from "../../utils/api";
 
 export default function WhaleTransactions() {
   const [transactions, setTransactions] = useState([]);
