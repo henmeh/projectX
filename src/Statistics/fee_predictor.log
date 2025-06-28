@@ -645,3 +645,29 @@ LINE 2: ...LUES ('2025-06-22T17:48:56.581003'::timestamp, 1, np.float64...
 2025-06-23 08:42:41,541 - fee_predictor - INFO - Prediction saved successfully
 2025-06-23 08:42:41,541 - fee_predictor - INFO - Prediction: Fast=4.2 | Medium=2.2 | Low=2.0
 2025-06-23 08:47:50,810 - fee_predictor - INFO - Service stopped by user
+2025-06-28 13:56:11,628 - fee_predictor - INFO - Loaded model version 8
+2025-06-28 13:56:11,639 - fee_predictor - INFO - Starting prediction service
+2025-06-28 14:06:11,663 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:06:21,090 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:06:21,116 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:06:21,116 - fee_predictor - INFO - Prediction: Fast=4.9 | Medium=2.3 | Low=3.8
+2025-06-28 14:16:11,763 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:16:12,160 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:16:12,175 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:16:12,175 - fee_predictor - INFO - Prediction: Fast=4.5 | Medium=2.7 | Low=2.4
+2025-06-28 14:26:11,774 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:26:12,406 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:26:12,438 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:26:12,439 - fee_predictor - INFO - Prediction: Fast=4.3 | Medium=2.4 | Low=2.7
+2025-06-28 14:36:11,853 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:36:12,507 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:36:12,526 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:36:12,526 - fee_predictor - INFO - Prediction: Fast=3.3 | Medium=1.8 | Low=1.7
+2025-06-28 14:46:11,873 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:46:12,980 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:46:12,993 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:46:12,994 - fee_predictor - INFO - Prediction: Fast=3.8 | Medium=2.6 | Low=1.8
+2025-06-28 14:56:11,924 - fee_predictor - INFO - Preparing real-time features
+2025-06-28 14:56:13,276 - fee_predictor - INFO - Successful fee prediction
+2025-06-28 14:56:13,299 - fee_predictor - INFO - Prediction saved successfully
+2025-06-28 14:56:13,300 - fee_predictor - INFO - Prediction: Fast=2.8 | Medium=1.9 | Low=1.4

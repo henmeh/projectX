@@ -1,136 +1,79 @@
-import { useEffect, useState } from "react";
-import { Table, Tooltip } from "antd";
-import { fetchWhaleTransactions } from "../../utils/api";
+import React, { useState, useEffect } from 'react';
+import { Table, Card, InputNumber, Typography } from 'antd';
+import { fetchWhaleTransactions } from '../../services/api';
 
-export default function WhaleTransactions() {
+const { Title } = Typography;
+
+const WhaleTransactions = () => {
   const [transactions, setTransactions] = useState([]);
-
+  const [loading, setLoading] = useState(true);
+  const [minBtc, setMinBtc] = useState(10);
+  
   useEffect(() => {
-    async function loadTransactions() {
-      try {
-        const data = await fetchWhaleTransactions();
-        if (data && data.whale_transactions) {
-          const sortedTransactions = data.whale_transactions
-            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
-            .slice(0, 50);
-          setTransactions(sortedTransactions);
-        }
-      } catch (error) {
-        console.error("Error fetching transactions:", error);
-      }
-    }
-
-    loadTransactions();
-
-    // Set interval to fetch data every 60 seconds
-    const interval = setInterval(loadTransactions, 60000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Format txid (show first 5 + last 5 chars)
-  const formatTxid = (txid) => {
-    if (!txid) return "";
-    return `${txid.slice(0, 5)}...${txid.slice(-5)}`;
-  };
-
-  // Format addresses (show first 5 + last 5 chars)
-  const formatAddress = (address) => {
-    if (!address) return "";
-    return `${address.slice(0, 8)}...${address.slice(-8)}`;
-  };
-
-  // Parse JSON string and format each address
-  const renderAddresses = (addresses) => {
-    if (!addresses) return "N/A";
-
-    try {
-      const parsedAddresses = JSON.parse(addresses); // Convert string to array
-
-      if (!Array.isArray(parsedAddresses) || parsedAddresses.length === 0) {
-        return "N/A";
-      }
-
-      return (
-        <Tooltip title={parsedAddresses.join(", ")}>
-          {parsedAddresses.map(formatAddress).slice(0,3).join(", ")} + {parsedAddresses.length - 3} more
-        </Tooltip>
-      )
-    } catch (error) {
-      console.error("Error parsing addresses:", error);
-      return "Invalid data";
-    }
-  };
-
+    const loadData = async () => {
+      setLoading(true);
+      const data = await fetchWhaleTransactions(minBtc);
+      setTransactions(data);
+      setLoading(false);
+    };
+    
+    loadData();
+  }, [minBtc]);
+  
   const columns = [
     {
-      title: "Timestamp",
-      dataIndex: "timestamp",
-      key: "timestamp",
-      width: 200,
+      title: 'Timestamp',
+      dataIndex: 'timestamp',
+      key: 'timestamp',
+      sorter: (a, b) => new Date(a.timestamp) - new Date(b.timestamp),
     },
     {
-      title: "Transaction ID",
-      dataIndex: "txid",
-      key: "txid",
-      width: 150,
-      render: (text) => (
-        <a
-          href={`https://mempool.space/tx/${text}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {formatTxid(text)}
-        </a>
-      ),
+      title: 'Transaction ID',
+      dataIndex: 'txid',
+      key: 'txid',
+      render: (text) => <span className="txid">{text.substring(0, 16)}...</span>,
     },
     {
-      title: "Input Addresses",
-      dataIndex: "tx_in_addr",
-      key: "input_addresses",
-      width: 300,
-      render: renderAddresses, // Properly formats all addresses
+      title: 'Amount (BTC)',
+      dataIndex: 'total_sent',
+      key: 'total_sent',
+      sorter: (a, b) => a.total_sent - b.total_sent,
+      render: (value) => value.toFixed(2),
     },
     {
-        title: "Output Addresses",
-        dataIndex: "tx_out_addr",
-        key: "input_addresses",
-        width: 300,
-        render: renderAddresses, // Properly formats all addresses
-    },
-    {
-      title: "Total Sent (BTC)",
-      dataIndex: "total_sent",
-      key: "total_sent",
-      width: 150,
-      render: (text) => Number(text).toFixed(3),
-    },
-    {
-        title: "Total Fee (sats)",
-        dataIndex: "fee_paid",
-        key: "fee_paid",
-        width: 150,
-        render: (text) => Number(text).toFixed(3),
-    },
-    {
-    title: "rel. Fee (sats/vbyte)",
-    dataIndex: "fee_per_vbyte",
-    key: "fee_per_vbyte",
-    width: 150,
-    render: (text) => Number(text).toFixed(3),
+      title: 'Fee (sat/vB)',
+      dataIndex: 'fee_per_vbyte',
+      key: 'fee_per_vbyte',
+      sorter: (a, b) => a.fee_per_vbyte - b.fee_per_vbyte,
     },
   ];
-
+  
   return (
-    <div>
-      <h2>Whale Transactions</h2>
-      <Table
-        dataSource={transactions}
-        columns={columns}
-        rowKey="txid"
-        pagination={true}
-        scroll={{ x: 700 }}
+    <Card 
+      title={<Title level={4} style={{ margin: 0 }}>Whale Transactions</Title>}
+      extra={
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span style={{ marginRight: 8 }}>Min BTC:</span>
+          <InputNumber 
+            min={1} 
+            max={1000} 
+            value={minBtc}
+            onChange={setMinBtc}
+          />
+        </div>
+      }
+      className="dashboard-card"
+    >
+      <Table 
+        dataSource={transactions} 
+        columns={columns} 
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+        rowKey={record => record.id || record.txid}
+        scroll={{ x: true }}
       />
-    </div>
+    </Card>
   );
-}
+};
+
+export default WhaleTransactions;

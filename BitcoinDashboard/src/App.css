@@ -1,0 +1,10 @@
+.dashboard-content {
+  padding: 24px;
+  overflow: auto;
+  height: calc(100vh - 64px); /* Full height minus topbar */
+}
+
+.dashboard-card {
+  margin-bottom: 0; /* Remove bottom margin for full height */
+  height: 100%;
+}

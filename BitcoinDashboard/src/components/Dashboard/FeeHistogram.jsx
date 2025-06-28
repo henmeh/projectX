@@ -1,124 +1,76 @@
-import { useEffect, useState } from "react";
-import { Bar } from "@ant-design/plots";
-import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolCongestion } from "../../utils/api";
-import { Card, Spin, Typography } from "antd";
+import React, { useState, useEffect } from 'react';
+import { Card, Typography } from 'antd';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { fetchFeeHistogram } from '../../services/api';
 
-const { Text } = Typography;
+const { Title } = Typography;
 
-export default function FeeHistogram() {
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [congestion, setCongestion] = useState(null);
-    const [feeEstimation, setFeeEstimation] = useState(null);
-
-    useEffect(() => {
-        async function loadData() {
-            try {
-                // Fetch fee histogram
-                const response = await fetchFeeHistogram();
-                if (response && response.histogram) {
-                    const formattedData = response.histogram.map(([feeRate, vsize]) => ({
-                        feeRate,
-                        vsize
-                    }));
-                    setData(formattedData);
-                }
-
-                // Fetch mempool congestion data
-                const congestionResponse = await fetchMempoolCongestion();
-                if (congestionResponse) {
-                    setCongestion(congestionResponse);
-                }
-
-                // Fetch fee estimation data
-                const feeEstimationResponse = await fetchFeeEstimation();
-                if (feeEstimationResponse) {
-                    setFeeEstimation(feeEstimationResponse);
-                }
-            } catch (error) {
-                console.error("Error fetching data:", error);
-            }
-            setLoading(false);
-        }
-
-        loadData();
-
-        // Set interval to fetch data every 60 seconds
-        const interval = setInterval(loadData, 60000);
-    
-        return () => clearInterval(interval);
-    }, []);
-
-    const config = {
-        data,
-        xField: "vsize",
-        yField: "feeRate",
-        seriesField: "feeRate",
-        colorField: "feeRate",
-        xAxis: {
-            label: { autoRotate: true },
-            title: { text: "Virtual Size (vsize)", style: { fontSize: 14 } },
-        },
-        yAxis: {
-            title: { text: "Fee Rate (sat/vB)", style: { fontSize: 14 } },
-        },
-        tooltip: { showMarkers: false },
-        meta: {
-            feeRate: { alias: "Fee Rate (sat/vB)" },
-            vsize: { alias: "Virtual Size (vB)" },
-        },
+const FeeHistogram = () => {
+  const [histogramData, setHistogramData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      const data = await fetchFeeHistogram();
+      if (data && data.histogram) {
+        // Transform data for visualization with unique keys
+        const transformed = data.histogram
+          .filter(item => item[1] > 0)
+          .map(([fee, count], index) => ({ 
+            fee, 
+            count,
+            id: `${fee}-${index}`  // Add unique key
+          }));
+        setHistogramData(transformed);
+      }
+      setLoading(false);
     };
-
-    return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Fee Estimation Cards - Placed in a row */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", justifyContent: "center" }}>
-                <Card style={{ flex: 1, minWidth: "250px", textAlign: "center" }}>
-                    <Text strong style={{ fontSize: "12px" }}>
-                        Fast Transaction: {feeEstimation?.fast_fee} sats/vbyte
-                    </Text>
-                </Card>
-
-                <Card style={{ flex: 1, minWidth: "250px", textAlign: "center" }}>
-                    <Text strong style={{ fontSize: "12px" }}>
-                        Medium Transaction: {feeEstimation?.medium_fee} sats/vbyte
-                    </Text>
-                </Card>
-
-                <Card style={{ flex: 1, minWidth: "250px", textAlign: "center" }}>
-                    <Text strong style={{ fontSize: "12px" }}>
-                        Slow Transaction: {feeEstimation?.low_fee} sats/vbyte
-                    </Text>
-                </Card>  
-            </div>
-
-            {/* Fee Histogram & Mempool Congestion Cards - Placed below */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "20px" }}>
-                <Card title="Fee Histogram" style={{ flex: 1, minWidth: "300px" }}>
-                    {loading ? <Spin size="large" /> : <Bar {...config} />}
-                </Card>
-
-                <Card title="Mempool Congestion" style={{ flex: 1, minWidth: "300px" }}>
-                    {loading ? (
-                        <Spin size="large" />
-                    ) : (
-                        congestion && (
-                            <div>
-                                <p>
-                                    <Text strong style={{ fontSize: "16px" }}>
-                                        Mempool Congestion: {congestion.congestion_status}
-                                    </Text>
-                                </p>
-                                <p>
-                                    <Text strong style={{ fontSize: "16px" }}>
-                                        Total Size: {congestion.total_vsize} vB
-                                    </Text>
-                                </p>
-                            </div>
-                        )
-                    )}
-                </Card>
-            </div>
+    
+    loadData();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  const CustomTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip">
+          <p className="label">{`${payload[0].payload.fee} sat/vB`}</p>
+          <p className="intro">{`Transactions: ${payload[0].value.toLocaleString()}`}</p>
         </div>
-    );
-}
+      );
+    }
+    return null;
+  };
+  
+  return (
+    <Card 
+      title={<Title level={4} style={{ margin: 0 }}>Fee Distribution Histogram</Title>}
+      className="dashboard-card"
+      loading={loading}
+    >
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart
+          data={histogramData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="fee" 
+            label={{ value: 'Fee (sat/vB)', position: 'insideBottom', offset: -5 }} 
+          />
+          <YAxis 
+            label={{ value: 'Transactions', angle: -90, position: 'insideLeft' }} 
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Bar dataKey="count" fill="#1890ff" name="Transaction Count" />
+        </BarChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+};
+
+export default FeeHistogram;
