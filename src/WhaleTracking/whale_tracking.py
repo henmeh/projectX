@@ -64,9 +64,6 @@ class WhaleTracking:
             
             for transaction in transactions:
                 total_sent = sum(float(transaction_output["value"]) for transaction_output in transaction.get("vout", []))
-                
-                if total_sent >= threshold:
-                    print(total_sent)
 
                 # Skip if below threshold
                 if total_sent < threshold:
@@ -150,7 +147,7 @@ class WhaleTracking:
             return False
     
     
-    def process_mempool_transactions(self, threshold: float = 100, batch_size: int = 100) -> int:
+    def process_mempool_transactions(self, threshold: float = 0, batch_size: int = 100) -> int:
         """
         Scan mempool for whale transactions and process them in batches
         Returns count of processed transactions
@@ -356,6 +353,7 @@ class WhaleTracking:
                 
 
     def track_whale_balances(self, addresses: list):
+
         """Track and store balance history for whale addresses"""
         for address in addresses:
             balance = self.get_address_balance(address)
@@ -367,3 +365,40 @@ class WhaleTracking:
                     VALUES (?, CURRENT_TIMESTAMP, ?)""",
                     (address, balance)
                 )
+    
+
+    def delete_mined_mempool_transactions(self):
+        txids = []
+        with self.connect_db() as conn:
+            with conn.cursor() as cursor:                
+                try:
+                    #fetch all txids from whale_transactions table
+                    cursor.execute(
+                        """SELECT txid FROM whale_transactions""")
+                    results = cursor.fetchall()
+                    for result in results:
+                        txids.append(result[0])
+                    #check if txid is in mempool
+                    for txid in txids:
+                        mempool_check = self.node.rpc_call("getmempoolentry", [txid])
+                        if mempool_check["error"] != None:
+                        #if mempool_check["error"]["message"] == "Transaction not in mempool":
+                            cursor.execute(
+                                """DELETE FROM whale_transactions 
+                                WHERE txid = %s""",
+                                (txid, )
+                            )
+                            cursor.execute(
+                                """DELETE FROM transactions_inputs 
+                                WHERE txid = %s""",
+                                (txid, )
+                            )
+                            cursor.execute(
+                                """DELETE FROM transactions_outputs
+                                WHERE txid = %s""",
+                                (txid, )
+                            )
+                    conn.commit()
+                    print("Done")
+                except Exception as e:
+                    print(f"hallo {e}")

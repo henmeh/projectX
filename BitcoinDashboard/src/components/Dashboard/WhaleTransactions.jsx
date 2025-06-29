@@ -7,7 +7,7 @@ const { Title } = Typography;
 const WhaleTransactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [minBtc, setMinBtc] = useState(10);
+  const [minBtc, setMinBtc] = useState(10.0);
   
   useEffect(() => {
     const loadData = async () => {
@@ -55,8 +55,8 @@ const WhaleTransactions = () => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <span style={{ marginRight: 8 }}>Min BTC:</span>
           <InputNumber 
-            min={1} 
-            max={1000} 
+            min={0} 
+            max={21000000} 
             value={minBtc}
             onChange={setMinBtc}
           />

@@ -54,6 +54,7 @@ const FeePredictions = () => {
   const getPredictionAccuracy = (current, predicted) => {
     if (!current || !predicted) return null;
     
+
     const accuracy = 100 - Math.abs((predicted - current) / current) * 100;
     return Math.max(0, Math.min(100, accuracy)).toFixed(1);
   };

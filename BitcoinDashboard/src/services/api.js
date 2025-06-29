@@ -13,7 +13,7 @@ const api = axios.create({
   }
 });
 
-export const fetchWhaleTransactions = async (minBtc = 10) => {
+export const fetchWhaleTransactions = async (minBtc = 10.0) => {
   try {
     const response = await api.get('/whale-transactions', {
       params: { min_btc: minBtc }

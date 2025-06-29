@@ -231,7 +231,7 @@ def get_mempool_congestion():
     try:
         histogram = result["histogram"]
         total_vsize = sum(entry[1] for entry in histogram)
-        congestion_status = "High" if total_vsize > 1_000_000 else "Low"
+        congestion_status = "High" if total_vsize > 5_000_000 else "Low"
         return {
             "timestamp": result["timestamp"],
             "congestion_status": congestion_status,

@@ -90,7 +90,6 @@ const Sidebar = () => {
       
       <div className="logo">B</div>
       <Menu
-        theme={darkMode ? "dark" : "light"}
         mode="inline"
         selectedKeys={[activeView]}
         onClick={handleMenuClick}
