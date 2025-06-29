@@ -368,37 +368,42 @@ class WhaleTracking:
     
 
     def delete_mined_mempool_transactions(self):
-        txids = []
-        with self.connect_db() as conn:
-            with conn.cursor() as cursor:                
-                try:
-                    #fetch all txids from whale_transactions table
-                    cursor.execute(
-                        """SELECT txid FROM whale_transactions""")
-                    results = cursor.fetchall()
-                    for result in results:
-                        txids.append(result[0])
-                    #check if txid is in mempool
-                    for txid in txids:
-                        mempool_check = self.node.rpc_call("getmempoolentry", [txid])
-                        if mempool_check["error"] != None:
-                        #if mempool_check["error"]["message"] == "Transaction not in mempool":
+        try:
+            # Fetch current mempool TXIDs in a single RPC call
+            mempool_response = self.node.rpc_call("getrawmempool", [])
+            if mempool_response["error"] is not None:
+                raise Exception(f"RPC error: {mempool_response['error']}")
+            
+            # Convert to set for O(1) lookups
+            mempool_txids = set(mempool_response["result"])
+            
+            # Process database transactions
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    # Fetch all TXIDs from database
+                    cursor.execute("SELECT txid FROM whale_transactions")
+                    db_txids = [row[0] for row in cursor.fetchall()]
+                    
+                    # Identify mined transactions (not in mempool)
+                    mined_txids = [txid for txid in db_txids if txid not in mempool_txids]
+                    
+                    # Batch delete mined transactions
+                    if mined_txids:
+                        # Format for SQL IN clause
+                        txid_placeholders = ','.join(['%s'] * len(mined_txids))
+                        
+                        # Delete from related tables
+                        for table in ["whale_transactions", "transactions_inputs", "transactions_outputs"]:
                             cursor.execute(
-                                """DELETE FROM whale_transactions 
-                                WHERE txid = %s""",
-                                (txid, )
+                                f"DELETE FROM {table} WHERE txid IN ({txid_placeholders})",
+                                mined_txids
                             )
-                            cursor.execute(
-                                """DELETE FROM transactions_inputs 
-                                WHERE txid = %s""",
-                                (txid, )
-                            )
-                            cursor.execute(
-                                """DELETE FROM transactions_outputs
-                                WHERE txid = %s""",
-                                (txid, )
-                            )
-                    conn.commit()
-                    print("Done")
-                except Exception as e:
-                    print(f"hallo {e}")
+                        
+                        conn.commit()
+                        print(f"Deleted {len(mined_txids)} mined transactions")
+                    else:
+                        print("No mined transactions found")
+        
+        except Exception as e:
+            print(f"Error: {e}")
+            # Add error handling/rollback as needed
