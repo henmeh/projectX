@@ -772,3 +772,70 @@ LINE 2: ...LUES ('2025-06-22T17:48:56.581003'::timestamp, 1, np.float64...
 2025-06-28 18:32:34,655 - fee_predictor - INFO - Prediction saved successfully
 2025-06-28 18:32:34,656 - fee_predictor - INFO - Prediction: Fast=2.2 | Medium=3.4 | Low=4.2
 2025-06-28 18:37:55,570 - fee_predictor - INFO - Service stopped by user
+2025-06-29 16:05:11,220 - fee_predictor - ERROR - Model file not found: ./models/fee_model_v1.joblib
+2025-06-29 16:05:11,229 - fee_predictor - INFO - No model found. Starting initial training...
+2025-06-29 16:05:11,230 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-29 16:05:11,399 - fee_predictor - INFO - Preprocessing data
+2025-06-29 16:06:21,256 - fee_predictor - INFO - Training hierarchical model with time-series validation
+2025-06-29 16:06:21,257 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 16:06:21,257 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 16:06:21,258 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 16:06:21,258 - fee_predictor - ERROR - Final training failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 16:06:21,259 - fee_predictor - ERROR - Initial training failed. Creating fallback model
+2025-06-29 16:06:21,259 - fee_predictor - INFO - Starting prediction service
+2025-06-29 16:06:21,259 - fee_predictor - INFO - Preparing real-time features
+2025-06-29 16:06:21,319 - fee_predictor - ERROR - Prediction failed: Pipeline is not fitted yet.
+Traceback (most recent call last):
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/pipeline.py", line 54, in _raise_or_warn_if_not_fitted
+    yield
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/pipeline.py", line 787, in predict
+    Xt = transform.transform(Xt)
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/utils/_set_output.py", line 319, in wrapped
+    data_to_wrap = f(self, X, *args, **kwargs)
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/compose/_column_transformer.py", line 1060, in transform
+    check_is_fitted(self)
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/utils/validation.py", line 1757, in check_is_fitted
+    raise NotFittedError(msg % {"name": type(estimator).__name__})
+sklearn.exceptions.NotFittedError: This ColumnTransformer instance is not fitted yet. Call 'fit' with appropriate arguments before using this estimator.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/media/henning/Volume/Programming/projectX/src/Statistics/fee_prediction.py", line 554, in predict_fees
+    predictions = self.model.predict(features.values)
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/pipeline.py", line 782, in predict
+    with _raise_or_warn_if_not_fitted(self):
+  File "/usr/lib/python3.10/contextlib.py", line 153, in __exit__
+    self.gen.throw(typ, value, traceback)
+  File "/media/henning/Volume/Programming/projectX/.venv/lib/python3.10/site-packages/sklearn/pipeline.py", line 56, in _raise_or_warn_if_not_fitted
+    raise NotFittedError("Pipeline is not fitted yet.") from exc
+sklearn.exceptions.NotFittedError: Pipeline is not fitted yet.
+2025-06-29 16:06:57,902 - fee_predictor - INFO - Service stopped by user
+2025-06-29 17:49:35,425 - fee_predictor - ERROR - Model file not found: ./models/fee_model_v1.joblib
+2025-06-29 17:49:35,440 - fee_predictor - INFO - No model found. Starting initial training...
+2025-06-29 17:49:35,440 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-29 17:49:35,541 - fee_predictor - INFO - Preprocessing data
+2025-06-29 17:50:31,396 - fee_predictor - INFO - Training hierarchical model with time-series validation
+2025-06-29 17:50:31,399 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 17:50:31,400 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 17:50:31,402 - fee_predictor - ERROR - Training fold failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 17:50:31,404 - fee_predictor - ERROR - Final training failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 17:50:31,404 - fee_predictor - WARNING - Creating minimal fallback model
+2025-06-29 17:50:31,404 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-29 17:50:31,418 - fee_predictor - INFO - Preprocessing data
+2025-06-29 17:50:31,452 - fee_predictor - ERROR - Minimal model creation failed: Specifying the columns using strings is only supported for dataframes.
+2025-06-29 17:50:31,452 - fee_predictor - ERROR - No valid model available. Service cannot start.
+2025-06-29 18:02:51,234 - fee_predictor - ERROR - Model file not found: ./models/fee_model_v1.joblib
+2025-06-29 18:02:51,246 - fee_predictor - INFO - No model found. Starting initial training...
+2025-06-29 18:02:51,247 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-29 18:02:51,389 - fee_predictor - INFO - Preprocessing data
+2025-06-29 18:03:47,031 - fee_predictor - INFO - Training hierarchical model with time-series validation
+2025-06-29 18:03:47,102 - fee_predictor - ERROR - Training fold failed: y should be a 1d array, got an array of shape (186, 3) instead.
+2025-06-29 18:03:47,129 - fee_predictor - ERROR - Training fold failed: y should be a 1d array, got an array of shape (372, 3) instead.
+2025-06-29 18:03:47,143 - fee_predictor - ERROR - Training fold failed: y should be a 1d array, got an array of shape (558, 3) instead.
+2025-06-29 18:03:47,155 - fee_predictor - ERROR - Final training failed: y should be a 1d array, got an array of shape (744, 3) instead.
+2025-06-29 18:03:47,156 - fee_predictor - WARNING - Creating minimal fallback model
+2025-06-29 18:03:47,156 - fee_predictor - INFO - Fetching fee data (last 24 hours)
+2025-06-29 18:03:47,165 - fee_predictor - INFO - Preprocessing data
+2025-06-29 18:03:47,225 - fee_predictor - ERROR - Minimal model creation failed: y should be a 1d array, got an array of shape (744, 3) instead.
+2025-06-29 18:03:47,226 - fee_predictor - ERROR - No valid model available. Service cannot start.

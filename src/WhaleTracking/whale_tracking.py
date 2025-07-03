@@ -147,7 +147,7 @@ class WhaleTracking:
             return False
     
     
-    def process_mempool_transactions(self, threshold: float = 0, batch_size: int = 100) -> int:
+    def process_mempool_transactions(self, threshold: float = 0, batch_size: int = 50) -> int:
         """
         Scan mempool for whale transactions and process them in batches
         Returns count of processed transactions

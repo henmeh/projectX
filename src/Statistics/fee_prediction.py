@@ -1,736 +1,475 @@
-import os
 import pandas as pd
+from sklearn.metrics import mean_squared_error
+from sklearn.ensemble import RandomForestRegressor 
+from sqlalchemy import create_engine, text, Table, MetaData, Column, DateTime, Numeric, String, insert
+import datetime as dt
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_absolute_error, mean_squared_error
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer
-from sklearn.compose import ColumnTransformer
-from sqlalchemy import create_engine, text
-import joblib
 import logging
-from datetime import datetime, timedelta
-import time
-import json
-import psutil
-import warnings
-from typing import Tuple, Optional, Dict
-import psycopg2
-from psycopg2.extras import execute_values
-import ast
-from sklearn.base import BaseEstimator, RegressorMixin
-from sklearn.utils.validation import check_X_y, check_array, check_is_fitted
+import pickle # For saving/loading models
+import os # For managing model files
 
-warnings.filterwarnings("ignore", category=FutureWarning)
+parameters = {
+    "very_short": {"fast_fee": {'bootstrap': False, 'max_depth': 7, 'max_features': 1.0, 'min_samples_leaf': 2, 'min_samples_split': 13, 'n_estimators': 207},
+                   "medium_fee": {'bootstrap': False, 'max_depth': 49, 'max_features': 'log2', 'min_samples_leaf': 5, 'min_samples_split': 14, 'n_estimators': 90},
+                   "low_fee": {'bootstrap': False, 'max_depth': 7, 'max_features': 1.0, 'min_samples_leaf': 2, 'min_samples_split': 13, 'n_estimators': 207}},
 
-class HierarchicalGBR(BaseEstimator, RegressorMixin):
-    """
-    Gradient Boosting Regressor with fee hierarchy enforcement
-    Ensures: fast_fee ≥ medium_fee ≥ low_fee
-    """
-    def __init__(self, **kwargs):
-        self.base_estimator = GradientBoostingRegressor(**kwargs)
-        self.estimator = None
-        
-    def fit(self, X, y):
-        # Validate fee hierarchy in training data
-        if not (y[:, 0] >= y[:, 1]).all() or not (y[:, 1] >= y[:, 2]).all():
-            raise ValueError("Training data violates fee hierarchy")
-            
-        X, y = check_X_y(X, y, multi_output=True)
-        self.estimator = self.base_estimator.fit(X, y)
-        self.n_features_in_ = X.shape[1]
-        return self
-        
-    def predict(self, X):
-        check_is_fitted(self)
-        X = check_array(X)
-        y_pred = self.estimator.predict(X)
-        
-        # Enforce hierarchy
-        for i in range(len(y_pred)):
-            fast, medium, low = y_pred[i]
-            
-            # Correct ordering violations
-            if fast < medium:
-                adjustment = (medium - fast) / 2
-                fast = medium + adjustment
-                medium = medium - adjustment
-                
-            if medium < low:
-                adjustment = (low - medium) / 2
-                medium = low + adjustment
-                low = low - adjustment
-                
-            if fast < medium or medium < low:
-                # Fallback to proportional values
-                if fast < low:
-                    fast = max(fast, low * 1.5)
-                medium = (fast + low) / 2
-                low = min(medium, low)
-                
-            y_pred[i] = [fast, medium, low]
-            
-        return y_pred
+    "hourly":     {"fast_fee": {'bootstrap': True, 'max_depth': 47, 'max_features': 1.0, 'min_samples_leaf': 4, 'min_samples_split': 14, 'n_estimators': 209},
+                   "medium_fee": {'bootstrap': False, 'max_depth': 6, 'max_features': 0.8, 'min_samples_leaf': 5, 'min_samples_split': 2, 'n_estimators': 253},
+                   "low_fee": {'bootstrap': True, 'max_depth': 27, 'max_features': 0.6, 'min_samples_leaf': 8, 'min_samples_split': 5, 'n_estimators': 153}},
+
+    "daily":      {"fast_fee": {'bootstrap': False, 'max_depth': 32, 'max_features': 'sqrt', 'min_samples_leaf': 7, 'min_samples_split': 2, 'n_estimators': 178},
+                   "medium_fee": {'bootstrap': True, 'max_depth': 33, 'max_features': 0.6, 'min_samples_leaf': 8, 'min_samples_split': 8, 'n_estimators': 171},
+                   "low_fee": {'bootstrap': True, 'max_depth': 18, 'max_features': 0.6, 'min_samples_leaf': 9, 'min_samples_split': 16, 'n_estimators': 64}},
+    
+    "weekly":     {"fast_fee": {'bootstrap': False, 'max_depth': 5, 'max_features': 0.8, 'min_samples_leaf': 8, 'min_samples_split': 12, 'n_estimators': 292},
+                   "medium_fee": {'bootstrap': False, 'max_depth': 5, 'max_features': 0.8, 'min_samples_leaf': 8, 'min_samples_split': 12, 'n_estimators': 292},
+                   "low_fee": {'bootstrap': False, 'max_depth': 5, 'max_features': 0.8, 'min_samples_leaf': 8, 'min_samples_split': 12, 'n_estimators': 292}}
+}
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class FeePredictor:
-    def __init__(self, db_uri: str, model_path: str = 'fee_model.joblib', 
-                 prediction_horizon: int = 1, retrain_interval: int = 10):
-        self.db_uri = db_uri
-        self.model_path = model_path
-        self.prediction_horizon = prediction_horizon
-        self.retrain_interval = retrain_interval
-        self.engine = create_engine(db_uri, pool_size=10, max_overflow=20, pool_pre_ping=True)
-        self.logger = self._setup_logger()
-        self.model = None
-        self.feature_columns = None
-        self.last_trained = None
-        self.model_version = 1
-        self.histogram_cache = {}
-        self.last_prediction = None
-        self._ensure_model_dir()
-        self.lags = [1, 5, 15, 30, 60]
-        self.windows = [15, 30, 60]
-        self.db_params = {
-            "dbname": "bitcoin_blockchain",
-            "user": "postgres",
-            "password": "projectX",
-            "host": "localhost",
-            "port": 5432,
-        }
-        
-        
-    def connect_db(self):
-        """Establish connection with optimized settings"""
-        conn = psycopg2.connect(
-            **self.db_params,
-            application_name="BlockchainAnalytics",
-            connect_timeout=10
-        )
-        
-        # Set critical performance parameters
-        with conn.cursor() as cur:
-            try:
-                # Stack depth solution for recursion errors
-                cur.execute("SET max_stack_depth = '7680kB';")
-                
-                # Query optimization flags
-                cur.execute("SET enable_partition_pruning = on;")
-                cur.execute("SET constraint_exclusion = 'partition';")
-                cur.execute("SET work_mem = '64MB';")
-                
-                # Transaction configuration
-                cur.execute("SET idle_in_transaction_session_timeout = '5min';")
-                conn.commit()
-            except psycopg2.Error as e:
-                print(f"Warning: Could not set session parameters: {e}")
-                conn.rollback()
-        
-        return conn
+    """
+    A class to fetch fee data from PostgreSQL, train models with various lookback periods,
+    and predict future fees while enforcing logical ordering.
+    """
     
-    def _ensure_model_dir(self):
-        model_dir = os.path.dirname(self.model_path)
-        if model_dir and not os.path.exists(model_dir):
-            try:
-                os.makedirs(model_dir, exist_ok=True)
-                self.logger.info(f"Created model directory: {model_dir}")
-            except Exception as e:
-                self.logger.error(f"Failed to create model directory: {str(e)}")
-                self.model_path = os.path.basename(self.model_path)
-        
-    def _setup_logger(self) -> logging.Logger:
-        logger = logging.getLogger('fee_predictor')
-        logger.setLevel(logging.INFO)
-        file_handler = logging.FileHandler('fee_predictor.log')
-        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(file_formatter)
-        console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter('[%(levelname)s] %(message)s')
-        console_handler.setFormatter(console_formatter)
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-        return logger
-        
-    def _db_safe_query(self, query: str) -> pd.DataFrame:
-        try:
-            with self.engine.connect() as conn:
-                return pd.read_sql(text(query), conn)
-        except Exception as e:
-            self.logger.error(f"Database error: {str(e)}")
-            return pd.DataFrame()
-        
-    def fetch_data(self, lookback_hours: int = 168) -> pd.DataFrame:
+    def __init__(self, db_connection_string, historical_table_name, 
+                 prediction_table_name='fee_predictions',
+                 lookback_intervals=None, forecast_horizon_hours=24,
+                 model_dir='./trained_models/'):
         """
-        Fetches data from the mempool_fee_histogram table for train the ml prediction model.
-        """
-        self.logger.info(f"Fetching fee data (last {lookback_hours} hours)")
-        query = f"""
-        SELECT timestamp, histogram, fast_fee, medium_fee, low_fee 
-        FROM mempool_fee_histogram 
-        WHERE timestamp >= NOW() - INTERVAL '{lookback_hours} hours'
-        ORDER BY timestamp
-        """
-        return self._db_safe_query(query)
-    
-    def safe_parse_histogram(self, hist_str: str) -> tuple[float, float, float, float, float]:
-        if hist_str in self.histogram_cache:
-            return self.histogram_cache[hist_str]
-            
-        default = (0.0, 0.0, 0.0, 0.0, 0.0)
-        
-        try:
-            if isinstance(hist_str, str):
-                try:
-                    hist = json.loads(hist_str)
-                except json.JSONDecodeError:
-                    try:
-                        hist = ast.literal_eval(hist_str)
-                    except:
-                        hist = []
-            else:
-                hist = hist_str
-                
-            if not isinstance(hist, list):
-                return default
-                
-            fees, counts = [], []
-            for item in hist:
-                if isinstance(item, (list, tuple)) and len(item) >= 2:
-                    try:
-                        fee = float(item[0])
-                        count = float(item[1])
-                        if fee >= 0 and count >= 0:
-                            fees.append(fee)
-                            counts.append(count)
-                    except (TypeError, ValueError):
-                        continue
-                elif isinstance(item, dict):
-                    try:
-                        fee = float(item.get('fee', 0))
-                        count = float(item.get('count', 0))
-                        if fee >= 0 and count >= 0:
-                            fees.append(fee)
-                            counts.append(count)
-                    except (TypeError, ValueError):
-                        continue
-            
-            if not fees:
-                return default
-                
-            fees = np.array(fees)
-            counts = np.array(counts)
-            total = counts.sum()
-            
-            if total == 0:
-                return default
-                
-            mean_fee = np.sum(fees * counts) / total
-            fee_distribution = np.repeat(fees, counts.astype(int))
-            
-            if len(fee_distribution) < 10:
-                pct_90 = np.percentile(fees, 90)
-                pct_75 = np.percentile(fees, 75)
-                pct_50 = np.percentile(fees, 50)
-            else:
-                pct_90 = np.percentile(fee_distribution, 90)
-                pct_75 = np.percentile(fee_distribution, 75)
-                pct_50 = np.percentile(fee_distribution, 50)
-            
-            percentiles = sorted([pct_90, pct_75, pct_50], reverse=True)
-            if percentiles != [pct_90, pct_75, pct_50]:
-                self.logger.warning("Auto-corrected inverted percentiles: "
-                                f"90p={pct_90}→{percentiles[0]}, "
-                                f"75p={pct_75}→{percentiles[1]}, "
-                                f"50p={pct_50}→{percentiles[2]}")
-                pct_90, pct_75, pct_50 = percentiles
-            
-            result = (total, mean_fee, pct_90, pct_75, pct_50)
-            self.histogram_cache[hist_str] = result
-            return result
-            
-        except Exception as e:
-            self.logger.error(f"Histogram parse error: {str(e)}")
-            return default
-    
-    def _add_features(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Centralized feature engineering"""
-        # Time features
-        df['hour_sin'] = np.sin(2 * np.pi * df.index.hour / 24)
-        df['hour_cos'] = np.cos(2 * np.pi * df.index.hour / 24)
-        df['day_sin'] = np.sin(2 * np.pi * df.index.dayofweek / 7)
-        df['day_cos'] = np.cos(2 * np.pi * df.index.dayofweek / 7)
-        
-        # Block time features
-        df['block_interval'] = df.index.to_series().diff().dt.total_seconds().fillna(600)
-        df['block_speed'] = 600 / df['block_interval']
-        
-        # Lag features
-        for lag in self.lags:
-            df[f'fast_fee_lag_{lag}'] = df['fast_fee'].shift(lag)
-            df[f'medium_fee_lag_{lag}'] = df['medium_fee'].shift(lag)
-            df[f'low_fee_lag_{lag}'] = df['low_fee'].shift(lag)
-            df[f'total_tx_lag_{lag}'] = df['total_tx'].shift(lag)
-        
-        # Rolling features
-        for window in self.windows:
-            df[f'fast_fee_rolling_{window}'] = df['fast_fee'].rolling(f'{window}min').mean()
-            df[f'tx_rolling_{window}'] = df['total_tx'].rolling(f'{window}min').mean()
-        
-        # EMA features
-        df['fast_fee_ema_30'] = df['fast_fee'].ewm(span=30, adjust=False).mean()
-        df['tx_ema_30'] = df['total_tx'].ewm(span=30, adjust=False).mean()
-        
-        return df.fillna(0)
-    
-    def preprocess_data(self, df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-        self.logger.info("Preprocessing data")
-        
-        if df.empty or len(df) < 100:
-            self.logger.warning("Insufficient data for preprocessing")
-            return pd.DataFrame(), pd.DataFrame()
+        Initializes the FeePredictor with database and prediction parameters.
 
-        df = df.set_index('timestamp').sort_index()
-        # Parse histogram
-        df['histogram_features'] = df['histogram'].apply(self.safe_parse_histogram)
-        df[['total_tx', 'mean_fee', 'p90_fee', 'p75_fee', 'p50_fee']] = pd.DataFrame(
-            df['histogram_features'].tolist(), index=df.index
-        )
+        Args:
+            db_connection_string (str): SQLAlchemy connection string for PostgreSQL.
+            historical_table_name (str): Name of the historical fee data table.
+            prediction_table_name (str): Name of the table to store predictions. Defaults to 'fee_predictions'.
+            lookback_intervals (dict, optional): Dictionary of lookback intervals for training.
+                                                Keys are model names (e.g., 'short_term'),
+                                                values are pandas Timedelta strings (e.g., '3H').
+                                                Defaults to {'short_term': '3H', 'medium_term': '3D', 'long_term': '3W'}.
+            forecast_horizon_hours (int): Number of hours into the future to predict. Defaults to 24.
+            model_dir (str): Directory to save/load trained models. Defaults to './trained_models/'.
+        """
+        self.db_connection_string = db_connection_string
+        self.historical_table_name = historical_table_name
+        self.prediction_table_name = prediction_table_name
+        self.forecast_horizon_hours = forecast_horizon_hours
+        self.model_dir = model_dir
         
-        # Add all features
-        df = self._add_features(df)
-        
-        # Future targets
-        df['fast_fee_future'] = df['fast_fee'].shift(-self.prediction_horizon)
-        df['medium_fee_future'] = df['medium_fee'].shift(-self.prediction_horizon)
-        df['low_fee_future'] = df['low_fee'].shift(-self.prediction_horizon)
-        
-        # Drop initial NaNs
-        df = df.dropna()
-        
-        # Identify feature columns
-        self.feature_columns = df.columns.difference([
-            'histogram', 'histogram_features', 'fast_fee', 'medium_fee', 'low_fee',
-            'fast_fee_future', 'medium_fee_future', 'low_fee_future'
-        ]).tolist()
-        
-        # Prepare features and targets
-        features = df[self.feature_columns]
-        targets = df[['fast_fee_future', 'medium_fee_future', 'low_fee_future']]
-
-        return features, targets
-    
-        
-    def create_model(self) -> Pipeline:
-        """Create constrained multi-output model"""
-        numeric_features = self.feature_columns
-        numeric_transformer = Pipeline(steps=[
-            ('imputer', SimpleImputer(strategy='median')),
-            ('scaler', StandardScaler())
-        ])
-        
-        preprocessor = ColumnTransformer(
-            transformers=[('num', numeric_transformer, numeric_features)])
-        
-        # Hierarchical model parameters
-        params = {
-            'loss': 'huber',
-            'n_estimators': 300,
-            'learning_rate': 0.05,
-            'max_depth': 7,
-            'validation_fraction': 0.15,
-            'n_iter_no_change': 15,
-            'random_state': 42
-        }
-        
-        return Pipeline(steps=[
-            ('preprocessor', preprocessor),
-            ('regressor', HierarchicalGBR(**params))
-        ])
-    
-    
-    def train_model(self, features: pd.DataFrame, targets: pd.DataFrame) -> Tuple[Pipeline, dict]:
-        self.logger.info("Training hierarchical model with time-series validation")
-        
-        if features.empty or targets.empty:
-            self.logger.error("Training aborted: Empty features/targets")
-            return None, {}
-        
-        # Time-based cross-validation
-        tscv = TimeSeriesSplit(n_splits=3)
-        metrics = {}
-        
-        # Create the model
-        model = self.create_model()
-        
-        # Prepare for cross-validation
-        X = features.values
-        y = targets.values
-        
-        # Initialize metrics storage
-        for col in targets.columns:
-            metrics[col] = {'mae': [], 'rmse': []}
-        
-        # Walk-forward validation
-        for train_idx, test_idx in tscv.split(features):
-            X_train, X_test = X[train_idx], X[test_idx]
-            y_train, y_test = y[train_idx], y[test_idx]
-            
-            try:
-                model.fit(X_train, y_train)
-                y_pred = model.predict(X_test)
-                
-                # Calculate metrics for each target
-                for i, col in enumerate(targets.columns):
-                    mae = mean_absolute_error(y_test[:, i], y_pred[:, i])
-                    rmse = np.sqrt(mean_squared_error(y_test[:, i], y_pred[:, i]))
-                    metrics[col]['mae'].append(mae)
-                    metrics[col]['rmse'].append(rmse)
-                    
-            except Exception as e:
-                self.logger.error(f"Training fold failed: {str(e)}")
-                continue
-        
-        # Final training on full dataset
-        try:
-            model.fit(X, y)
-        except Exception as e:
-            self.logger.error(f"Final training failed: {str(e)}")
-            return None, {}
-        
-        # Calculate final metrics
-        final_metrics = {}
-        y_pred_full = model.predict(X)
-        for i, col in enumerate(targets.columns):
-            final_metrics[col] = {
-                'mae': mean_absolute_error(y[:, i], y_pred_full[:, i]),
-                'rmse': np.sqrt(mean_squared_error(y[:, i], y_pred_full[:, i])),
-                'cv_mae': np.mean(metrics[col]['mae']),
-                'cv_rmse': np.mean(metrics[col]['rmse'])
+        if lookback_intervals is None:
+            self.lookback_intervals = {
+                "short_term": "3H",
+                "medium_term": "3D",
+                "long_term": "3W"
             }
-        
-        # Save model
-        model_data = {
-            'model': model,
-            'feature_columns': self.feature_columns,
-            'metrics': final_metrics,
-            'version': self.model_version,
-            'trained_at': datetime.utcnow()
-        }
-        
-        try:
-            joblib.dump(model_data, self.model_path)
-            self.logger.info(f"Model saved to {self.model_path}")
-        except Exception as e:
-            fallback_path = f"fee_model_v{self.model_version}.joblib"
-            joblib.dump(model_data, fallback_path)
-            self.model_path = fallback_path
-            self.logger.warning(f"Saved model to fallback location: {fallback_path}")
+        else:
+            self.lookback_intervals = lookback_intervals
+            
+        self.engine = create_engine(self.db_connection_string)
+        self.metadata = MetaData() # For reflecting/defining tables for core SQL operations
 
-        self.model = model
-        self.last_trained = datetime.utcnow()
-        self.model_version += 1
-        
-        self.logger.info(f"Training complete. Model version: {self.model_version - 1}")
-        return model, final_metrics
-    
+        # Define the prediction table structure without ORM class
+        # Ensure these match your external DDL for the 'fee_predictions' table
+        self.fee_predictions_table = Table(
+            self.prediction_table_name, self.metadata,
+            # No 'id' column here, assuming your table has it as SERIAL PRIMARY KEY managed by DB
+            Column('prediction_time', DateTime, nullable=False),
+            Column('model_name', String(50), nullable=False),
+            Column('fast_fee', Numeric, nullable=False),
+            Column('medium_fee', Numeric, nullable=False),
+            Column('low_fee', Numeric, nullable=False),
+            Column('generated_at', DateTime, nullable=False)
+        )
 
-    def load_model(self) -> bool:
+        # Ensure model directory exists
+        os.makedirs(self.model_dir, exist_ok=True)
+        
+        self.trained_models_by_lookback = {} # To store trained models (loaded or newly trained)
+        self.latest_predictions = {} # To store the most recent predictions
+        logging.info("FeePredictor initialized.")
+
+    def _fetch_fee_data(self):
         """
-        Loads existing model. Returns True if successful.
-        """
-        try:
-            if not os.path.exists(self.model_path):
-                self.logger.error(f"Model file not found: {self.model_path}")
-                return False
-                
-            model_data = joblib.load(self.model_path)
-            self.model = model_data['model']
-            self.feature_columns = model_data['feature_columns']
-            self.last_trained = model_data['trained_at']
-            self.model_version = model_data['version']
-            self.logger.info(f"Loaded model version {self.model_version}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Model loading failed: {str(e)}")
-            return False
-
-
-    def prepare_current_features(self, future_minutes: int = 0) -> Optional[pd.DataFrame]:
-        """Prepare features for future prediction time"""
-        self.logger.info("Preparing real-time features")
-        
-        # Calculate future timestamp
-        prediction_time = datetime.utcnow() + timedelta(minutes=future_minutes)
-        
-        # Fetch recent data (last 2 hours)
-        query = """
-        SELECT timestamp, histogram, fast_fee, medium_fee, low_fee 
-        FROM mempool_fee_histogram 
-        WHERE timestamp >= NOW() - INTERVAL '2 hours'
-        ORDER BY timestamp DESC
+        Fetches fee data from the PostgreSQL database.
+        Assumes the table has 'timestamp', 'fast_fee', 'medium_fee', and 'low_fee' columns.
         """
         try:
-            df = pd.read_sql(text(query), self.engine)
+            query = f"SELECT timestamp, fast_fee, medium_fee, low_fee FROM {self.historical_table_name} ORDER BY timestamp"
+            df = pd.read_sql(query, self.engine)
+            logging.info(f"Data fetched successfully from PostgreSQL table '{self.historical_table_name}'.")
+            return df
         except Exception as e:
-            self.logger.error(f"Data fetch failed: {str(e)}")
+            logging.error(f"Error fetching data from PostgreSQL database: {e}")
+            logging.error("Please ensure your DB_CONNECTION_STRING, historical_table_name, and column names are correct.")
             return None
-        
-        if df.empty:
-            self.logger.warning("No recent data available")
-            return None
-        
-        # Preprocessing pipeline
+
+    @staticmethod
+    def _create_features(df):
+        """
+        Creates time-based features from a datetime index.
+        """
+        if not isinstance(df.index, pd.DatetimeIndex):
+            df.index = pd.to_datetime(df.index) # Ensure index is datetime
+            
+        df['hour'] = df.index.hour
+        df['dayofweek'] = df.index.dayofweek
+        df['month'] = df.index.month
+        df['year'] = df.index.year
+        return df
+
+    def _preprocess_data(self, df):
+        """
+        Prepares the data for model training. This function now returns the full dataset
+        with features, so subsets can be taken based on lookback intervals later.
+        """
         df['timestamp'] = pd.to_datetime(df['timestamp'])
-        df = df.set_index('timestamp').sort_index()
+        df.set_index('timestamp', inplace=True)
+        df.sort_index(inplace=True) # Ensure chronological order
+
+        df = self._create_features(df)
         
-        # Parse histogram
-        df['histogram_features'] = df['histogram'].apply(self.safe_parse_histogram)
-        df[['total_tx', 'mean_fee', 'p90_fee', 'p75_fee', 'p50_fee']] = pd.DataFrame(
-            df['histogram_features'].tolist(), index=df.index
-        )
+        features = ['hour', 'dayofweek', 'month', 'year']
+        target_fees = ['fast_fee', 'medium_fee', 'low_fee']
         
-        # Add all features consistently with training
-        df = self._add_features(df)
+        X_all = df[features]
+        y_all_dict = {fee: df[fee] for fee in target_fees}
         
-        # Use the latest data point
-        if len(df) == 0:
-            return None
-        latest = df.iloc[-1]
+        logging.info(f"Data preprocessed. Total observations: {len(X_all)}")
+        return X_all, y_all_dict
+
+
+    def _train_models(self, X_data, y_data_dict, lookback_timedelta=None, model_key_name=None): # ADDED model_key_name
+        """
+        Trains a separate Random Forest Regressor model for each fee category,
+        optionally filtering data by a lookback timedelta.
+        """
+        if lookback_timedelta:
+            end_time = X_data.index.max()
+            start_time = end_time - lookback_timedelta
+            
+            X_train_filtered = X_data[X_data.index >= start_time]
+            y_train_dict_filtered = {fee: y_data_dict[fee][y_data_dict[fee].index >= start_time] 
+                                     for fee in y_data_dict.keys()}
+            
+            logging.info(f"  Training with lookback: {str(lookback_timedelta)} (Data points: {len(X_train_filtered)})")
+        else:
+            X_train_filtered = X_data
+            y_train_dict_filtered = y_data_dict
+            logging.info(f"  Training with ALL available data (Data points: {len(X_train_filtered)})")
+
+        if X_train_filtered.empty:
+            logging.warning("  No data available for the specified lookback window. Skipping model training.")
+            return {}
+
+        trained_models = {}
         
-        # Prepare feature dictionary
-        features = {
-            'hour_sin': np.sin(2 * np.pi * prediction_time.hour / 24),
-            'hour_cos': np.cos(2 * np.pi * prediction_time.hour / 24),
-            'day_sin': np.sin(2 * np.pi * prediction_time.weekday() / 7),
-            'day_cos': np.cos(2 * np.pi * prediction_time.weekday() / 7),
-            'block_speed': latest.get('block_speed', 1.0),
+        # Define default parameters in case a model_key_name or fee_type is not found in `parameters`
+        default_params = {
+            'n_estimators': 100, 'max_features': 'sqrt', 'max_depth': None, 
+            'min_samples_split': 2, 'min_samples_leaf': 1, 'bootstrap': True
         }
-        
-        # Add all other features
-        for col in self.feature_columns:
-            if col in latest:
-                features[col] = latest[col]
+
+        for fee_type, y_train in y_train_dict_filtered.items():
+            if not y_train.empty:
+                logging.info(f"    Training model for {fee_type}...")
+                
+                current_model_params = default_params # Start with defaults
+
+                # Use model_key_name to retrieve specific tuned parameters
+                if model_key_name and model_key_name in parameters and fee_type in parameters[model_key_name]:
+                    current_model_params = parameters[model_key_name][fee_type]
+                    logging.info(f"    Using tuned parameters for {model_key_name} {fee_type}: {current_model_params}")
+                else:
+                    logging.warning(f"    No specific tuned parameters found for '{model_key_name}' and '{fee_type}'. Using default parameters.")
+                
+                model = RandomForestRegressor(**current_model_params, random_state=42, n_jobs=-1)
+                model.fit(X_train_filtered, y_train)
+                trained_models[fee_type] = model
+                logging.info(f"    Model for {fee_type} trained.")
             else:
-                features[col] = 0.0
-                self.logger.warning(f"Feature {col} missing, using 0")
-        
-        feature_df = pd.DataFrame([features])
-        
-        # Ensure all required columns are present
-        missing_cols = set(self.feature_columns) - set(feature_df.columns)
-        for col in missing_cols:
-            feature_df[col] = 0.0
-            self.logger.warning(f"Added missing feature {col} with 0")
-            
-        return feature_df[self.feature_columns]    
-
-
-    def predict_fees(self) -> Optional[Dict[str, float]]:
-        """Predict fees for future horizon with hierarchy enforcement"""
-        current_time = datetime.now()
-        
-        # Use cached prediction if available and recent
-        if self.last_prediction:
-            cache_age = (current_time - self.last_prediction['predicted_at']).total_seconds()
-            if cache_age < self.prediction_horizon * 60 - 30:  # 30-second buffer
-                return self.last_prediction
-                
-        # Load model if not available
-        if not self.model:
-            if not self.load_model():
-                self.logger.error("Prediction aborted: No valid model")
-                return None
-                
-        try:
-            # Prepare features for exact prediction horizon
-            features = self.prepare_current_features(future_minutes=self.prediction_horizon)
-            if features is None or features.empty:
-                self.logger.error("Feature preparation failed")
-                return None
-                
-            # Make prediction
-            predictions = self.model.predict(features.values)
-            if predictions.size < 3:
-                self.logger.error("Prediction output shape invalid")
-                return None
-                
-            fast, medium, low = predictions[0]
-            
-            # Final validation and clamping
-            if not (fast >= medium >= low):
-                self.logger.warning(f"Hierarchy violation: {fast:.2f} ≥ {medium:.2f} ≥ {low:.2f}")
-                # Enforce ordering
-                medium = min(fast, max(medium, low))
-                low = min(medium, low)
-                fast = max(fast, medium)
-                
-                # Final check
-                if not (fast >= medium >= low):
-                    # Fallback: proportional values
-                    fast = max(fast, 1.0)
-                    low = min(low, fast * 0.8)
-                    medium = (fast + low) / 2
-            
-            # Create prediction object
-            prediction = {
-                'predicted_at': current_time,
-                'prediction_time': current_time + timedelta(minutes=self.prediction_horizon),
-                'model_version': self.model_version,
-                'fast_fee': max(0.1, fast),
-                'medium_fee': max(0.05, medium),
-                'low_fee': max(0.01, low),
-            }
-            
-            # Update cache
-            self.last_prediction = prediction
-            return prediction
-            
-        except Exception as e:
-            self.logger.error(f"Prediction failed: {str(e)}", exc_info=True)
-            return None
-
-    def save_prediction(self, prediction: dict) -> bool:
-        """
-        Saves fee prediction in database
-        """
-        if not prediction:
-            return False
-        
-        with self.connect_db() as conn:
-            with conn.cursor() as cursor:                
-                try:
-                    cursor.execute(
-                        """INSERT INTO fee_prediction 
-                        (predicted_at, prediction_time, model_version, 
-                         fast_fee_pred, medium_fee_pred, low_fee_pred)
-                        VALUES (%s, %s, %s, %s, %s, %s)""",
-                        (
-                            prediction["predicted_at"],
-                            prediction["prediction_time"],
-                            prediction["model_version"],
-                            float(prediction["fast_fee"]),
-                            float(prediction["medium_fee"]),
-                            float(prediction["low_fee"])
-                        )
-                    )
-                    conn.commit()
-                    self.logger.info("Prediction saved successfully")
-                    return True
-                except Exception as e:
-                    self.logger.error(f"Save failed: {e}")
-                    conn.rollback()
-                    return False
+                logging.warning(f"    No target data for {fee_type} in this lookback. Skipping training.")
+        return trained_models
     
-    def run_training(self, lookback_days: int = 1) -> bool:
-        """
-        Trains the ML prediction model with data from the DB.
-        """
-        try:
-            # Check system resources
-            mem = psutil.virtual_memory()
-            if mem.available < 1 * 1024**3:  # 1GB threshold
-                self.logger.warning("Insufficient memory for training")
-                return False
-                
-            start_time = time.time()
-            df = self.fetch_data(lookback_hours=lookback_days * 24)
 
-            if len(df) < 500:
-                self.logger.error("Insufficient training data")
-                return False
-                
-            features, targets = self.preprocess_data(df)
-
-            if len(features) < 300:
-                self.logger.error("Insufficient features after preprocessing")
-                return False
-                
-            model, metrics = self.train_model(features, targets)
-            if not model:
-                return False
-                        
-            # Log performance
-            for target, metric in metrics.items():
-                self.logger.info(
-                    f"{target} - MAE: {metric['mae']:.4f}, "
-                    f"RMSE: {metric['rmse']:.4f}, "
-                    f"CV_MAE: {metric['cv_mae']:.4f}"
-                )
-                
-            self.logger.info(f"Training completed in {(time.time()-start_time)/60:.1f} minutes")
-            return True
-        except Exception as e:
-            self.logger.exception(f"Training failed: {str(e)}")
-            return False
-    
-    def run(self) -> None:
-        # Initial model loading
-        if not self.load_model():
-            self.logger.info("No model found. Starting initial training...")
-            if not self.run_training():
-                self.logger.error("Initial training failed. Creating fallback model")
-                # Create fallback model
-                self.model = self.create_model()
-                self.last_trained = datetime.utcnow()
-        
-        # Service lifecycle
-        self.logger.info("Starting prediction service")
-        last_training = datetime.utcnow()
-        next_prediction = datetime.utcnow()
-        
-        while True:
+    def _save_models(self, models, model_name_prefix):
+        """Saves trained models to disk."""
+        for fee_type, model in models.items():
+            filename = os.path.join(self.model_dir, f"{model_name_prefix}_{fee_type}.pkl")
             try:
-                now = datetime.utcnow()
-                
-                # Periodic retraining
-                if (now - last_training).total_seconds() >= self.retrain_interval * 60:
-                    self.logger.info("Starting periodic retraining")
-                    if self.run_training():
-                        last_training = datetime.utcnow()
-                    else:
-                        self.logger.warning("Retraining failed, using existing model")
-                
-                # Make prediction at scheduled time
-                if now >= next_prediction:
-                    prediction = self.predict_fees()
-                    if prediction:
-                        self.save_prediction(prediction)
-                        self.logger.info(
-                            f"Prediction for {prediction['prediction_time']}: "
-                            f"Fast={prediction['fast_fee']:.2f} | "
-                            f"Medium={prediction['medium_fee']:.2f} | "
-                            f"Low={prediction['low_fee']:.2f}"
-                        )
-                    
-                    # Schedule next prediction
-                    next_prediction = now + timedelta(minutes=self.prediction_horizon)
-                    
-                    # Catch up if missed predictions
-                    while next_prediction < now:
-                        next_prediction += timedelta(minutes=self.prediction_horizon)
-                
-                # Calculate sleep time
-                sleep_time = min(
-                    max(1, (next_prediction - now).total_seconds()),
-                    max(1, (last_training + timedelta(minutes=self.retrain_interval) - now).total_seconds())
-                )
-                time.sleep(sleep_time)
-                
-            except KeyboardInterrupt:
-                self.logger.info("Service stopped by user")
-                break
+                with open(filename, 'wb') as f:
+                    pickle.dump(model, f)
+                logging.info(f"  Saved model for {fee_type} as {filename}")
             except Exception as e:
-                self.logger.error(f"Main loop error: {str(e)}")
-                time.sleep(min(30, self.prediction_horizon * 60))
+                logging.error(f"  Failed to save model {filename}: {e}")
+
+    def _load_models(self, model_name_prefix):
+        """Loads trained models from disk."""
+        loaded_models = {}
+        for fee_type in ['fast_fee', 'medium_fee', 'low_fee']: # Assuming these fee types
+            filename = os.path.join(self.model_dir, f"{model_name_prefix}_{fee_type}.pkl")
+            if os.path.exists(filename):
+                try:
+                    with open(filename, 'rb') as f:
+                        loaded_models[fee_type] = pickle.load(f)
+                    logging.info(f"  Loaded model for {fee_type} from {filename}")
+                except Exception as e:
+                    logging.warning(f"  Could not load model {filename}: {e}. Will retrain.")
+                    loaded_models = {} # Clear partial loads if one fails
+                    break
+            else:
+                logging.info(f"  No saved model found for {fee_type} at {filename}. Will train new.")
+                loaded_models = {} # Indicate no models found for this prefix
+                break
+        return loaded_models if loaded_models else None
 
 
+    def _predict_future_fees(self, trained_models, current_time):
+        """
+        Predicts future fees for a given time horizon and enforces logical ordering:
+        low_fee <= medium_fee <= fast_fee.
+        
+        Args:
+            trained_models (dict): A dictionary of trained models (one for each fee type).
+            current_time (datetime): The timestamp from which to start the prediction horizon.
+        
+        Returns:
+            pd.DataFrame: A DataFrame with the predicted fees, indexed by future timestamps,
+                          with enforced logical ordering.
+        """
+        # Ensure we predict from the next full hour
+        start_prediction_time = current_time.replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
+        
+        future_timestamps = pd.date_range(start=start_prediction_time, 
+                                          periods=self.forecast_horizon_hours, 
+                                          freq='h') 
+        future_df = pd.DataFrame(index=future_timestamps)
+        
+        future_features_df = self._create_features(future_df)
+        
+        raw_predictions_df = pd.DataFrame(index=future_timestamps)
+        
+        for fee_type, model in trained_models.items():
+            if model: # Ensure model was trained successfully for this fee type
+                raw_predictions_df[fee_type] = model.predict(future_features_df)
+            else:
+                raw_predictions_df[fee_type] = np.nan # If no model was trained, fill with NaN
+                
+        # --- Enforce logical ordering: low_fee <= medium_fee <= fast_fee ---
+        corrected_predictions_df = raw_predictions_df.copy()
+
+        for index, row in raw_predictions_df.iterrows():
+            if row.isnull().any(): # Skip if any value is NaN (e.g., model not trained)
+                corrected_predictions_df.loc[index] = np.nan # Ensure corrected row is also NaN
+                continue 
+                
+            low = row['low_fee']
+            medium = row['medium_fee']
+            fast = row['fast_fee']
+
+            # Apply corrections in sequence
+            low = min(low, medium, fast) # Low should be the minimum of the three
+            fast = max(low, medium, fast) # Fast should be the maximum of the three
+            # Medium should be between low and fast (if it's out of bounds, set to nearest boundary)
+            medium = max(low, min(medium, fast))
+
+            # Ensure non-negativity
+            corrected_predictions_df.loc[index, 'low_fee'] = max(0, low)
+            corrected_predictions_df.loc[index, 'medium_fee'] = max(0, medium)
+            corrected_predictions_df.loc[index, 'fast_fee'] = max(0, fast)
+            
+        return corrected_predictions_df
+
+    def _store_predictions_to_db(self, predictions_df, model_name):
+        """
+        Stores the generated predictions into the database table 'fee_predictions'.
+        
+        Args:
+            predictions_df (pd.DataFrame): DataFrame containing predictions with
+                                           'fast_fee', 'medium_fee', 'low_fee' columns
+                                           and a datetime index.
+            model_name (str): The name of the model that generated these predictions (e.g., 'short_term').
+        """
+        generated_at = dt.datetime.now() # Timestamp when this batch of predictions was generated
+        records_to_insert = []
+
+        for index, row in predictions_df.iterrows():
+            if not row.isnull().any(): # Only store valid predictions
+                records_to_insert.append({
+                    'prediction_time': index,
+                    'model_name': model_name,
+                    'fast_fee': float(row['fast_fee']),    # Convert to standard Python float
+                    'medium_fee': float(row['medium_fee']),# Convert to standard Python float
+                    'low_fee': float(row['low_fee']),      # Convert to standard Python float
+                    'generated_at': generated_at
+                })
+        
+        if records_to_insert:
+            conn = None
+            try:
+                conn = self.engine.connect()
+                # Use SQLAlchemy core's insert() to insert multiple rows
+                conn.execute(insert(self.fee_predictions_table), records_to_insert)
+                conn.commit() # Commit the transaction
+                logging.info(f"Successfully stored {len(records_to_insert)} predictions for model '{model_name}' to '{self.prediction_table_name}'.")
+            except Exception as e:
+                logging.error(f"Error storing predictions for model '{model_name}': {e}")
+                if conn:
+                    conn.rollback() # Rollback on error
+            finally:
+                if conn:
+                    conn.close()
+        else:
+            logging.warning(f"No valid predictions to store for model '{model_name}'.")
+
+
+    def run(self, retrain_interval_hours=24):
+        """
+        Executes the full prediction pipeline: fetches data, trains/loads models for various
+        lookback periods, predicts future fees, and stores the results.
+        """
+        logging.info(f"Starting FeePredictor run at {dt.datetime.now()}...")
+        
+        current_time_for_prediction = pd.to_datetime(dt.datetime.now())
+
+        df_all = self._fetch_fee_data()
+        if df_all is None or df_all.empty:
+            logging.error("No data fetched or data is empty. Cannot proceed with prediction.")
+            self.latest_predictions = {}
+            return self.latest_predictions
+
+        X_all, y_all_dict = self._preprocess_data(df_all)
+        
+        train_size = int(len(X_all) * 0.8)
+        X_train_full = X_all[:train_size]
+        y_train_full_dict = {key: val[:train_size] for key, val in y_all_dict.items()}
+        
+        X_test_full = X_all[train_size:]
+        y_test_full_dict = {key: val[train_size:] for key, val in y_all_dict.items()}
+
+        logging.info(f"Total historical data observations: {len(X_all)}")
+        logging.info(f"Full training data observations (for lookback slicing): {len(X_train_full)}")
+        logging.info(f"Test data observations (for evaluation): {len(X_test_full)}")
+
+        self.latest_predictions = {} 
+        self.trained_models_by_lookback = {} 
+
+        for name, interval_str in self.lookback_intervals.items(): # 'name' is 'very_short', 'hourly', etc.
+            logging.info(f"\n--- Processing {name.replace('_', ' ').title()} Model ({interval_str} Lookback) ---")
+            lookback_timedelta = pd.Timedelta(interval_str)
+            
+            model_name_prefix = f"model_{name}"
+            trained_models_for_interval = None
+
+            last_training_time_path = os.path.join(self.model_dir, f"{model_name_prefix}_last_trained.txt")
+            retrain_needed = True
+            if os.path.exists(last_training_time_path):
+                try:
+                    with open(last_training_time_path, 'r') as f:
+                        last_trained_str = f.read().strip()
+                        last_trained_time = dt.datetime.fromisoformat(last_trained_str)
+                        time_since_last_train = current_time_for_prediction - last_trained_time
+                        if time_since_last_train < dt.timedelta(hours=retrain_interval_hours):
+                            logging.info(f"  Models for {name} trained {time_since_last_train} ago, less than {retrain_interval_hours} hours. Attempting to load existing models.")
+                            loaded_models = self._load_models(model_name_prefix)
+                            if loaded_models:
+                                trained_models_for_interval = loaded_models
+                                retrain_needed = False
+                            else:
+                                logging.warning(f"  Failed to load models for {name}. Retraining.")
+                        else:
+                            logging.info(f"  Models for {name} trained {time_since_last_train} ago, more than {retrain_interval_hours} hours. Retraining.")
+
+                except Exception as e:
+                    logging.warning(f"  Could not read last trained time for {name}: {e}. Retraining.")
+            else:
+                logging.info(f"  No previous training record found for {name}. Retraining.")
+
+            if retrain_needed:
+                # Step 3: Train models for the current lookback
+                # PASSED 'name' as model_key_name HERE:
+                trained_models_for_interval = self._train_models(X_train_full, y_train_full_dict, lookback_timedelta, model_key_name=name)
+                if trained_models_for_interval:
+                    self._save_models(trained_models_for_interval, model_name_prefix)
+                    with open(last_training_time_path, 'w') as f:
+                        f.write(current_time_for_prediction.isoformat())
+                else:
+                    logging.warning(f"  No models trained for {name} lookback after retraining attempt. Skipping prediction.")
+                    continue
+
+            if not trained_models_for_interval:
+                logging.warning(f"  No trained models available for {name}. Skipping prediction and storage.")
+                continue
+
+            self.trained_models_by_lookback[name] = trained_models_for_interval 
+            
+            logging.info(f"Evaluating {name.replace('_', ' ').title()} model performance on the test set:")
+            for fee_type, model in trained_models_for_interval.items():
+                if model and not X_test_full.empty and not y_test_full_dict[fee_type].empty:
+                    predictions_test = model.predict(X_test_full)
+                    mse = mean_squared_error(y_test_full_dict[fee_type], predictions_test)
+                    logging.info(f"  Mean Squared Error (MSE) for {fee_type}: {mse:.2f}")
+                else:
+                    logging.warning(f"  Skipping evaluation for {fee_type}: Test set is empty or model not trained.")
+            
+            current_predictions = self._predict_future_fees(trained_models_for_interval, current_time_for_prediction)
+            self.latest_predictions[name] = current_predictions
+
+            self._store_predictions_to_db(current_predictions, name)
+        
+        logging.info("FeePredictor run completed. Predictions stored in DB and memory.")
+        return self.latest_predictions
+
+# --- Example Usage ---
 if __name__ == "__main__":
+    # IMPORTANT: Replace with your actual PostgreSQL credentials
+    DB_CONN_STR = 'postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain'
+    HISTORICAL_FEE_TABLE = 'mempool_fee_histogram'
+    PREDICTION_TABLE = 'fee_predictions' # Make sure this table exists and matches the schema below
+
+    # --- Manual DDL for fee_predictions table (run this in PgAdmin4 or your SQL client) ---
+    # CREATE TABLE fee_predictions (
+    #     id SERIAL PRIMARY KEY, -- PostgreSQL automatically handles this ID
+    #     prediction_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    #     model_name VARCHAR(50) NOT NULL,
+    #     fast_fee NUMERIC NOT NULL,
+    #     medium_fee NUMERIC NOT NULL,
+    #     low_fee NUMERIC NOT NULL,
+    #     generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+    # );
+    # Ensure your 'NUMERIC' types in PostgreSQL are sufficient for your fee values (e.g., NUMERIC(10, 2))
+    # TIMESTAMP WITH TIME ZONE is generally preferred for timestamps.
+    # --------------------------------------------------------------------------------------
+
+    custom_lookbacks = {
+        "very_short": "1H",
+        "hourly": "12H",
+        "daily": "7D",
+        "weekly": "4W"
+    }
+
+    # Initialize the predictor
     predictor = FeePredictor(
-        db_uri="postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain",
-        model_path="./models/fee_model_v1.joblib",
-        prediction_horizon=10,  # Predict 10 minutes into future
-        retrain_interval=1440   # Retrain every 24 hours
+        db_connection_string=DB_CONN_STR,
+        historical_table_name=HISTORICAL_FEE_TABLE,
+        prediction_table_name=PREDICTION_TABLE,
+        lookback_intervals=custom_lookbacks, 
+        forecast_horizon_hours=48, # Predict 48 hours into the future
+        model_dir='./trained_models/' # Directory to save/load models
     )
-    predictor.run()
+
+    # Call the run method to get predictions
+    # Set retrain_interval_hours to define how often a full retraining should occur.
+    # For example, 24 means retrain if last training was more than 24 hours ago.
+    predictions_result = predictor.run(retrain_interval_hours=0) 
+
+    if predictions_result:
+        logging.info("\n--- Final Predictions Summary (from current run) ---")
+        for model_name, predictions_df in predictions_result.items():
+            logging.info(f"\nPredictions from {model_name.replace('_', ' ').title()} Model:")
+            print(predictions_df) # Using print for DataFrame display
+            logging.info("-" * 50)
+    else:
+        logging.info("No predictions generated.")
