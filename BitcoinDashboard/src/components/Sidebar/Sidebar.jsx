@@ -35,11 +35,11 @@ const Sidebar = () => {
       icon: <BarChartOutlined />, 
       label: 'Fee Histogram' 
     },
-    { 
-      key: 'fee-cards', 
-      icon: <DollarOutlined />, 
-      label: 'Current Fees' 
-    },
+    //{ 
+    //  key: 'fee-cards', 
+    //  icon: <DollarOutlined />, 
+    //  label: 'Current Fees' 
+    //},
     { 
       key: 'fee-predictions', 
       icon: <RocketOutlined />, 
