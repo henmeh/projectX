@@ -51,7 +51,7 @@ MIN_DAILY_DATA_POINTS = 2 * 24
 MIN_WEEKLY_DATA_POINTS = 2 * 24 * 7 
 MIN_YEARLY_DATA_POINTS = 2 * 24 * 365 
 
-class FeePredictor:
+class FeePredictorProphet:
     """
     A class to fetch fee data from PostgreSQL, train models using Facebook Prophet,
     and predict future fees while enforcing logical ordering.
@@ -60,7 +60,7 @@ class FeePredictor:
     def __init__(self, db_connection_string, historical_table_name, 
                  prediction_table_name='fee_predictions',
                  lookback_intervals=None, forecast_horizon_hours=24,
-                 model_dir='./trained_models/',
+                 model_dir='./trained_models_prophet/',
                  tuning_enabled=True,
                  tuning_metrics=['mape'], 
                  tuning_cv_initial_days=60, # Initial training period for cross-validation
@@ -758,13 +758,13 @@ if __name__ == "__main__":
     }
 
     try:
-        predictor = FeePredictor(
+        predictor = FeePredictorProphet(
             db_connection_string=DB_CONN_STR,
             historical_table_name=HISTORICAL_FEE_TABLE,
             prediction_table_name=PREDICTION_TABLE,
             lookback_intervals=custom_lookbacks, 
             forecast_horizon_hours=48, # Predict 48 hours into the future
-            model_dir='./trained_models/',
+            model_dir='./trained_models_prophet/',
             tuning_enabled=True, 
             tuning_metrics=['mape'], # Mean Absolute Percentage Error
             tuning_cv_initial_days=60, # Initial training period for CV
