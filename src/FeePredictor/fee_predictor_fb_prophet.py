@@ -58,7 +58,7 @@ class FeePredictorProphet:
     """
     
     def __init__(self, db_connection_string, historical_table_name, 
-                 prediction_table_name='fee_predictions',
+                 prediction_table_name='fee_predictions_prophet',
                  lookback_intervals=None, forecast_horizon_hours=24,
                  model_dir='./trained_models_prophet/',
                  tuning_enabled=True,
@@ -748,7 +748,7 @@ if __name__ == "__main__":
     # IMPORTANT: Replace with your actual PostgreSQL credentials
     DB_CONN_STR = 'postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain'
     HISTORICAL_FEE_TABLE = 'mempool_fee_histogram'
-    PREDICTION_TABLE = 'fee_predictions' # Make sure this table exists and matches the schema below
+    PREDICTION_TABLE = 'fee_predictions_prophet' # Make sure this table exists and matches the schema below
 
     custom_lookbacks = {
         "very_short": "3d",  

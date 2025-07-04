@@ -38,7 +38,7 @@ class FeePredictorRandomForest:
     """
     
     def __init__(self, db_connection_string, historical_table_name, 
-                 prediction_table_name='fee_predictions',
+                 prediction_table_name='fee_predictions_random_forest',
                  lookback_intervals=None, forecast_horizon_hours=24,
                  model_dir='./trained_models_random_forest/'):
         """
@@ -541,7 +541,7 @@ if __name__ == "__main__":
     # IMPORTANT: Replace with your actual PostgreSQL credentials
     DB_CONN_STR = 'postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain'
     HISTORICAL_FEE_TABLE = 'mempool_fee_histogram'
-    PREDICTION_TABLE = 'fee_predictions' # Make sure this table exists and matches the schema below
+    PREDICTION_TABLE = 'fee_predictions_random_forest' # Make sure this table exists and matches the schema below
 
     # --- Manual DDL for fee_predictions table (run this in PgAdmin4 or your SQL client) ---
     # CREATE TABLE fee_predictions (
