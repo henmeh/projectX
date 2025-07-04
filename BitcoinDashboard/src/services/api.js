@@ -45,13 +45,13 @@ export const fetchFeeHistogram = async () => {
   }
 };
 
-export const fetchFeePrediction = async () => {
+export const fetchFeePrediction = async (tableName) => {
   try {
-    const response = await api.get('/fee-prediction');
-    return response.data || null;
+    const response = await api.get(`/fee-prediction/${tableName}`);
+    return response.data || [];
   } catch (error) {
-    console.error('Error fetching fee prediction:', error);
-    return null;
+    console.error(`Error fetching fee predictions for ${tableName}:`, error);
+    return [];
   }
 };
 
