@@ -64,9 +64,6 @@ class WhaleTracking:
             
             for transaction in transactions:
                 total_sent = sum(float(transaction_output["value"]) for transaction_output in transaction.get("vout", []))
-                
-                if total_sent >= threshold:
-                    print(total_sent)
 
                 # Skip if below threshold
                 if total_sent < threshold:
@@ -150,7 +147,7 @@ class WhaleTracking:
             return False
     
     
-    def process_mempool_transactions(self, threshold: float = 100, batch_size: int = 100) -> int:
+    def process_mempool_transactions(self, threshold: float = 0, batch_size: int = 50) -> int:
         """
         Scan mempool for whale transactions and process them in batches
         Returns count of processed transactions
@@ -356,6 +353,7 @@ class WhaleTracking:
                 
 
     def track_whale_balances(self, addresses: list):
+
         """Track and store balance history for whale addresses"""
         for address in addresses:
             balance = self.get_address_balance(address)
@@ -367,3 +365,45 @@ class WhaleTracking:
                     VALUES (?, CURRENT_TIMESTAMP, ?)""",
                     (address, balance)
                 )
+    
+
+    def delete_mined_mempool_transactions(self):
+        try:
+            # Fetch current mempool TXIDs in a single RPC call
+            mempool_response = self.node.rpc_call("getrawmempool", [])
+            if mempool_response["error"] is not None:
+                raise Exception(f"RPC error: {mempool_response['error']}")
+            
+            # Convert to set for O(1) lookups
+            mempool_txids = set(mempool_response["result"])
+            
+            # Process database transactions
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    # Fetch all TXIDs from database
+                    cursor.execute("SELECT txid FROM whale_transactions")
+                    db_txids = [row[0] for row in cursor.fetchall()]
+                    
+                    # Identify mined transactions (not in mempool)
+                    mined_txids = [txid for txid in db_txids if txid not in mempool_txids]
+                    
+                    # Batch delete mined transactions
+                    if mined_txids:
+                        # Format for SQL IN clause
+                        txid_placeholders = ','.join(['%s'] * len(mined_txids))
+                        
+                        # Delete from related tables
+                        for table in ["whale_transactions", "transactions_inputs", "transactions_outputs"]:
+                            cursor.execute(
+                                f"DELETE FROM {table} WHERE txid IN ({txid_placeholders})",
+                                mined_txids
+                            )
+                        
+                        conn.commit()
+                        print(f"Deleted {len(mined_txids)} mined transactions")
+                    else:
+                        print("No mined transactions found")
+        
+        except Exception as e:
+            print(f"Error: {e}")
+            # Add error handling/rollback as needed

@@ -92,9 +92,9 @@ class Mempool:
             
             # Prepare result
             result = {
-                "fast": percentiles[25]["fee"] or 0,
-                "medium": percentiles[50]["fee"] or 0,
-                "low": percentiles[75]["fee"] or 0,
+                "fast": percentiles[25]["fee"] or 1,
+                "medium": percentiles[50]["fee"] or 1,
+                "low": percentiles[75]["fee"] or 1,
                 "histogram": fee_histogram
             }
             

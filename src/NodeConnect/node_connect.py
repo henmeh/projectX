@@ -62,3 +62,6 @@ class NodeConnect():
                 else:
                     print(f"RPC Error: {e} for txid {param}")
             return responses
+        
+
+        
