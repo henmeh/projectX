@@ -72,6 +72,7 @@ class FeePredictorProphet:
         self.prediction_table_name = prediction_table_name
         self.forecast_horizon_hours = forecast_horizon_hours
         self.model_dir = model_dir
+        self.generated_at = dt.datetime.now()
         
         if lookback_intervals is None:
             self.lookback_intervals = {
@@ -526,7 +527,6 @@ class FeePredictorProphet:
             logging.warning(f"No predictions DataFrame provided to store for model '{model_name}'.")
             return
 
-        generated_at = dt.datetime.now()
         records_to_insert = []
 
         for index, row in predictions_df.iterrows():
@@ -538,7 +538,7 @@ class FeePredictorProphet:
                     'fast_fee': float(row['fast_fee']), # Ensure numeric types for DB
                     'medium_fee': float(row['medium_fee']),
                     'low_fee': float(row['low_fee']),
-                    'generated_at': generated_at
+                    'generated_at': self.generated_at
                 })
         
         if records_to_insert:
@@ -546,11 +546,11 @@ class FeePredictorProphet:
                 with self.engine.connect() as conn:
                     # Delete existing predictions for this model and prediction times
                     # This ensures idempotence and prevents primary key violations on subsequent runs
-                    delete_stmt = self.fee_predictions_table.delete().where(
-                        self.fee_predictions_table.c.model_name == model_name,
-                        self.fee_predictions_table.c.prediction_time.in_([rec['prediction_time'] for rec in records_to_insert])
-                    )
-                    conn.execute(delete_stmt)
+                    #delete_stmt = self.fee_predictions_table.delete().where(
+                    #    self.fee_predictions_table.c.model_name == model_name,
+                    #    self.fee_predictions_table.c.prediction_time.in_([rec['prediction_time'] for rec in records_to_insert])
+                    #)
+                    #conn.execute(delete_stmt)
                     
                     conn.execute(insert(self.fee_predictions_table), records_to_insert)
                     conn.commit() 

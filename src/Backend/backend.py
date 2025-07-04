@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 import psycopg2
 from psycopg2 import pool
@@ -183,19 +183,28 @@ def get_fee_estimation():
     raise HTTPException(status_code=404, detail="No fee data available")
 
 
-@app.get("/fee-prediction/")
-def get_fee_prediction():
+@app.get("/fee-prediction/{table_name}")
+def get_fee_prediction(table_name: str = Path(..., description="The name of the prediction table (e.g., 'fee_predictions_prophet', 'fee_predictions_random_forest')")):
     """Fetches latest fee prediction"""
-    query = """
-        SELECT prediction_timestamp, model_version, fast_fee_pred AS fast_fee, 
-               medium_fee_pred AS medium_fee, low_fee_pred AS low_fee
-        FROM fee_prediction 
-        ORDER BY prediction_timestamp DESC 
-        LIMIT 1
+    query = f"""
+        SELECT
+            prediction_time,
+            model_name,
+            fast_fee,
+            medium_fee,
+            low_fee,
+            generated_at
+        FROM
+            {table_name}
+        WHERE
+            generated_at = (SELECT MAX(generated_at) FROM {table_name})
+            AND prediction_time >= NOW() AT TIME ZONE 'UTC' -- Use NOW() AT TIME ZONE 'UTC' for robust timezone handling
+        ORDER BY
+            prediction_time ASC, model_name ASC; -- Order for consistent display
     """
     result = fetch_data(query)
     if result:
-        return result[0]
+        return result
     raise HTTPException(status_code=404, detail="No prediction data available")
 
 

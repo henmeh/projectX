@@ -60,6 +60,7 @@ class FeePredictorRandomForest:
         self.prediction_table_name = prediction_table_name
         self.forecast_horizon_hours = forecast_horizon_hours
         self.model_dir = model_dir
+        self.generated_at = dt.datetime.now()
         
         if lookback_intervals is None:
             self.lookback_intervals = {
@@ -294,7 +295,6 @@ class FeePredictorRandomForest:
                                            and a datetime index.
             model_name (str): The name of the model that generated these predictions (e.g., 'short_term').
         """
-        generated_at = dt.datetime.now() # Timestamp when this batch of predictions was generated
         records_to_insert = []
 
         for index, row in predictions_df.iterrows():
@@ -305,7 +305,7 @@ class FeePredictorRandomForest:
                     'fast_fee': float(row['fast_fee']),    # Convert to standard Python float
                     'medium_fee': float(row['medium_fee']),# Convert to standard Python float
                     'low_fee': float(row['low_fee']),      # Convert to standard Python float
-                    'generated_at': generated_at
+                    'generated_at': self.generated_at
                 })
         
         if records_to_insert:
@@ -577,7 +577,7 @@ if __name__ == "__main__":
     # Call the run method to get predictions
     # Set retrain_interval_hours to define how often a full retraining should occur.
     # For example, 24 means retrain if last training was more than 24 hours ago.
-    predictions_result = predictor.run(retrain_interval_hours=0) 
+    predictions_result = predictor.run(retrain_interval_hours=24) 
 
     if predictions_result:
         logging.info("\n--- Final Predictions Summary (from current run) ---")
