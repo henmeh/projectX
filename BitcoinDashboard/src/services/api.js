@@ -65,6 +65,16 @@ export const fetchMempoolCongestion = async () => {
   }
 };
 
+export const fetchHistoricalFeeHeatmap = async (days = 7) => {
+  try {
+    const response = await api.get(`/historical-fee-heatmap/${days}`);
+    return response.data
+  } catch (error) {
+    console.error('Error fetching historical fee heatmap data:', error);
+    return null;
+  }
+};
+
 export const fetchMempoolInsights = async () => {
   try {
     const response = await api.get('/mempool-insights'); // Matches Flask endpoint

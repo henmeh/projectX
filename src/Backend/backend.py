@@ -303,6 +303,59 @@ def get_historical_histogram(hours: int = 24):
     return {"historical_histograms": fetch_data(query, (f"{hours} hours",))}
 
 
+@app.get("/historical-fee-heatmap/{days}")
+def get_historical_fee_heatmap(days: int = 7):
+    """
+    Fetches historical average fee data grouped by day of week and hour of day
+    for a heatmap visualization.
+    """
+    if days <= 0:
+        raise HTTPException(status_code=400, detail="Days must be positive")
+    if days > 90:  # Limit to a reasonable historical range, e.g., 90 days
+        days = 90
+        
+    query = """
+        SELECT
+            EXTRACT(DOW FROM timestamp) AS day_of_week_num, -- 0=Sunday, 1=Monday, ..., 6=Saturday
+            EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC') AS hour_of_day,
+            CAST(AVG(fast_fee) AS NUMERIC(10,1)) AS avg_fee
+        FROM
+            mempool_fee_histogram
+        WHERE
+            timestamp >= NOW() - INTERVAL %s
+        GROUP BY
+            EXTRACT(DOW FROM timestamp),
+            EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC')
+        ORDER BY
+            day_of_week_num,
+            hour_of_day;
+    """
+    # PostgreSQL EXTRACT(DOW) returns 0 for Sunday, 1 for Monday, etc.
+    # The frontend expects a specific mapping.
+    day_mapping = {
+        0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat'
+    }
+
+    raw_data = fetch_data(query, (f"{days} days",))
+    
+    # Map numerical day of week to string day of week
+    heatmap_data = []
+    for row in raw_data:
+        day_num = int(row['day_of_week_num'])
+        hour = int(row['hour_of_day'])
+        avg_fee = float(row['avg_fee'])
+        heatmap_data.append({
+            "day": day_mapping.get(day_num, 'Unknown'),
+            "hour": hour,
+            "avg_fee": avg_fee
+        })
+    
+    if not heatmap_data:
+        raise HTTPException(status_code=404, detail="No historical fee data available for the specified range.")
+        
+    return heatmap_data
+
+
 # --- Endpoint to fetch latest mempool insights for the frontend ---
 @app.get('/mempool-insights')
 def get_mempool_insights():

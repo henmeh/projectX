@@ -136,41 +136,7 @@ class MempoolAnalyzer:
             logging.exception("Detailed traceback for DB storage error:")
             raise # Re-raise to indicate failure
 
-    def get_latest_mempool_insights(self):
-        """Fetches the latest batch of mempool insights from the database."""
-        try:
-            with self.engine.connect() as conn:
-                query = text(f"""
-                    SELECT
-                        amount_range,
-                        total_vsize_bytes,
-                        avg_fee_per_vbyte,
-                        transaction_count,
-                        generated_at
-                    FROM
-                        {self.mempool_insights_table_name}
-                    WHERE
-                        generated_at = (SELECT MAX(generated_at) FROM {self.mempool_insights_table_name})
-                    ORDER BY
-                        CASE amount_range
-                            WHEN '0-1 BTC' THEN 1
-                            WHEN '1-10 BTC' THEN 2
-                            WHEN '10-50 BTC' THEN 3
-                            WHEN '50-100 BTC' THEN 4
-                            WHEN '>100 BTC' THEN 5
-                            ELSE 6
-                        END ASC;
-                """)
-                result = conn.execute(query)
-                column_names = result.keys()
-                insights = [dict(zip(column_names, row)) for row in result]
-                logging.info(f"Fetched {len(insights)} latest mempool insights.")
-                return insights
-        except Exception as e:
-            logging.error(f"Error fetching latest mempool insights: {e}")
-            logging.exception("Detailed traceback for DB fetch error:")
-            return []
-
+    
 # Example Usage (for testing the backend logic)
 if __name__ == "__main__":
     # IMPORTANT: Replace with your actual database connection string
@@ -189,22 +155,6 @@ if __name__ == "__main__":
         print("Running mempool analysis...")
         latest_insights = analyzer.analyze_mempool_transactions()
         
-        #if latest_insights:
-        #    print("\nLatest Insights Stored:")
-        #    for insight in latest_insights:
-        #        print(insight)
-        #else:
-        #    print("No insights generated or stored.")
-
-        ## You can also fetch the latest insights directly
-        #print("\nFetching latest insights from DB:")
-        #fetched_insights = analyzer.get_latest_mempool_insights()
-        #if fetched_insights:
-        #    for insight in fetched_insights:
-        #        print(insight)
-        #else:
-        #    print("No insights fetched from DB.")
-
     except RuntimeError as e:
         logging.critical(f"Application terminated due to critical setup error: {e}")
     except Exception as e:
