@@ -69,8 +69,8 @@ const FeePredictions = () => {
   // Effect hook to run data loading on component mount and on interval
   useEffect(() => {
     loadData(); // Initial load
-    // Refresh every minute to get the very latest batch (if new batches are stored in DB)
-    const interval = setInterval(loadData, 60000);
+    // Refresh every hour to get the very latest batch (if new batches are stored in DB)
+    const interval = setInterval(loadData, 60000*60);
     return () => clearInterval(interval); // Cleanup on unmount
   }, [loadData]); // `loadData` is a dependency, ensuring it's always the latest version
 

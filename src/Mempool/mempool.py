@@ -2,13 +2,8 @@ import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 import json
 import time
-import numpy as np
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
-from Helper.helperfunctions import store_data, fetch_data
 from datetime import datetime
 import psycopg2
-from psycopg2.extras import execute_values
 
 class Mempool:
     def __init__(self, node):
@@ -147,80 +142,3 @@ class Mempool:
             # Ensure connection is always closed
             if conn:
                 conn.close()
-                
-    
-    def predict_fee_rates(self, time_horizon: int = 10) -> dict:
-        """Predict future fee rates using polynomial regression"""
-        conn = self.connect_db()
-        cursor = conn.cursor()
-        try:
-            # Fetch historical data
-            query = """
-                        SELECT timestamp, fast_fee, medium_fee, low_fee FROM mempool_fee_histogram
-                        WHERE timestamp >= datetime('now', '-2 hours') ORDER BY timestamp ASC   
-                    """
-            execute_values(cursor, query, [])
-            data = cursor.fetchall()
-            
-            if not data or len(data) < 5:
-                current = self.get_mempool_feerates()
-                return {
-                    "fast": current["fast"],
-                    "medium": current["medium"],
-                    "low": current["low"]
-                }
-            
-            # Prepare data arrays
-            timestamps = []
-            fast_fees = []
-            medium_fees = []
-            low_fees = []
-            
-            # Convert string timestamps to datetime objects
-            for row in data:
-                # SQLite returns timestamps as strings
-                timestamp_str = row[0]
-                # Handle different timestamp formats
-                if '.' in timestamp_str:
-                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S.%f")
-                else:
-                    dt = datetime.strptime(timestamp_str, "%Y-%m-%d %H:%M:%S")
-                timestamps.append(dt)
-                fast_fees.append(row[1])
-                medium_fees.append(row[2])
-                low_fees.append(row[3])
-            
-            # Convert to minutes since first timestamp
-            min_timestamp = min(timestamps)
-            minutes = [(ts - min_timestamp).total_seconds() / 60 for ts in timestamps]
-            
-            # Create polynomial features
-            poly = PolynomialFeatures(degree=2)
-            X = np.array(minutes).reshape(-1, 1)
-            X_poly = poly.fit_transform(X)
-            
-            # Train models and predict
-            predictions = {}
-            for fee_type, values in [("fast", fast_fees), ("medium", medium_fees), ("low", low_fees)]:
-                model = LinearRegression()
-                model.fit(X_poly, values)
-                
-                future_minute = minutes[-1] + time_horizon
-                future_poly = poly.transform([[future_minute]])
-                pred_value = model.predict(future_poly)[0]
-                predictions[fee_type] = max(1, round(pred_value, 2))
-            
-            # Store prediction
-            execute_values(
-                cursor,
-                "INSERT INTO fee_predictions (prediction_time, fast_fee_pred, medium_fee_pred, low_fee_pred) VALUES (?, ?, ?, ?)",
-                (time_horizon, predictions["fast"], predictions["medium"], predictions["low"])
-            )
-            conn.commit()
-            
-            return predictions
-        
-        except Exception as e:
-            print(f"Error predicting fee rates: {str(e)}")
-            current = self.get_mempool_feerates()
-            return {"fast": current["fast"], "medium": current["medium"], "low": current["low"]}

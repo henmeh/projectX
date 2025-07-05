@@ -43,7 +43,7 @@ const Sidebar = () => {
     { 
       key: 'fee-predictions', 
       icon: <RocketOutlined />, 
-      label: 'Fee Predictions' 
+      label: 'Fee Statistics' 
     },
     { 
       key: 'fee-pressure', 
