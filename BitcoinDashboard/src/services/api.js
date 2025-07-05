@@ -64,3 +64,13 @@ export const fetchMempoolCongestion = async () => {
     return null;
   }
 };
+
+export const fetchMempoolInsights = async () => {
+  try {
+    const response = await api.get('/mempool-insights'); // Matches Flask endpoint
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching mempool insights:', error);
+    return [];
+  }
+};

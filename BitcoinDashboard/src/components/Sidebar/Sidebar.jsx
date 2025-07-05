@@ -28,18 +28,13 @@ const Sidebar = () => {
     { 
       key: 'whale-transactions', 
       icon: <DollarOutlined />, 
-      label: 'Whale Transactions' 
+      label: 'Mempool Transactions' 
     },
     { 
       key: 'fee-histogram', 
       icon: <BarChartOutlined />, 
-      label: 'Fee Histogram' 
+      label: 'Mempool Insights' 
     },
-    //{ 
-    //  key: 'fee-cards', 
-    //  icon: <DollarOutlined />, 
-    //  label: 'Current Fees' 
-    //},
     { 
       key: 'fee-predictions', 
       icon: <RocketOutlined />, 

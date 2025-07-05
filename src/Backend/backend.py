@@ -303,6 +303,38 @@ def get_historical_histogram(hours: int = 24):
     return {"historical_histograms": fetch_data(query, (f"{hours} hours",))}
 
 
+# --- Endpoint to fetch latest mempool insights for the frontend ---
+@app.get('/mempool-insights')
+def get_mempool_insights():
+    """
+    Fetches the latest aggregated mempool insights (vsize and fee distribution by value sent).
+    """
+    query = """
+            SELECT
+                amount_range,
+                total_vsize_bytes,
+                avg_fee_per_vbyte,
+                transaction_count,
+                generated_at
+            FROM mempool_value_insights
+            WHERE
+                generated_at = (SELECT MAX(generated_at) FROM mempool_value_insights)
+            ORDER BY
+                CASE amount_range
+                    WHEN '0-1 BTC' THEN 1
+                    WHEN '1-10 BTC' THEN 2
+                    WHEN '10-50 BTC' THEN 3
+                    WHEN '50-100 BTC' THEN 4
+                    WHEN '>100 BTC' THEN 5
+                    ELSE 6
+                END ASC;
+                """
+    result = fetch_data(query)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="No mempool-insights data available")
+
+
 if __name__ == "__main__":
     # Run using: python this_file_name.py
     uvicorn.run(
