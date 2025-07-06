@@ -2,23 +2,22 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Segmented } from 'antd';
 import { ClockCircleOutlined, PieChartOutlined } from '@ant-design/icons';
 import { Heatmap } from '@ant-design/plots';
+import { ResponsiveHeatMap } from '@nivo/heatmap'
+
 
 // Import API functions
 import { fetchMempoolCongestion, fetchFeeHistogram, fetchHistoricalFeeHeatmap } from '../../services/api';
-
-// IMPORT THE EXTERNAL DATA PREPARATION FUNCTION. NO JAVASCRIPT CODE BLOCKS HERE.
-import { prepareHeatmapData } from '../../utils/dataPreparation'; // <<<--- ADJUST THIS PATH TO MATCH YOUR PROJECT STRUCTURE
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
 
+// This component is unchanged, as requested.
 const CurrentMempoolVisualizer = () => {
   const [congestionStatus, setCongestionStatus] = useState(null);
   const [mempoolBlocks, setMempoolBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
   const BLOCK_VSIZE_LIMIT = 1000000;
 
   useEffect(() => {
@@ -32,11 +31,7 @@ const CurrentMempoolVisualizer = () => {
         ]);
         setCongestionStatus(congestionData);
         if (!histogramData?.histogram) throw new Error("Fee histogram data missing.");
-
-        const sortedFeeLevels = histogramData.histogram
-          .map(([fee, v_size]) => ({ fee: parseFloat(fee), v_size }))
-          .sort((a, b) => b.fee - a.fee);
-
+        const sortedFeeLevels = histogramData.histogram.map(([fee, v_size]) => ({ fee: parseFloat(fee), v_size })).sort((a, b) => b.fee - a.fee);
         const blocks = [];
         let currentBlock = { v_size: 0, fees: [] };
         for (const level of sortedFeeLevels) {
@@ -104,6 +99,8 @@ const CurrentMempoolVisualizer = () => {
 };
 
 
+// --- ✨ NEW AND IMPROVED HistoricalFeeHeatmap component ---
+// --- CORRECTED HistoricalFeeHeatmap component ---
 const HistoricalFeeHeatmap = () => {
   const [heatmapData, setHeatmapData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -114,300 +111,121 @@ const HistoricalFeeHeatmap = () => {
     const loadHistoricalData = async () => {
       setLoading(true);
       setError(null);
-      let daysToFetch = 7;
-      if (timeRange === 'Last 30 Days') {
-        daysToFetch = 30;
-      }
-
       try {
+        const daysToFetch = timeRange === 'Last 30 Days' ? 30 : 7;
         const rawData = await fetchHistoricalFeeHeatmap(daysToFetch);
 
-        if (Array.isArray(rawData) && rawData.length > 0) {
-          const processedData = prepareHeatmapData(rawData);
-          setHeatmapData(processedData);
-        } else {
-          setHeatmapData([]);
-          setError("No historical fee data available.");
+        if (!Array.isArray(rawData) || rawData.length === 0) {
+          throw new Error("No historical data returned from API.");
         }
+        setHeatmapData(rawData);
+
       } catch (err) {
         console.error("Failed to load historical fee heatmap:", err);
-        setError("Could not load historical fee data.");
+        setError("Could not load historical fee data. Please try again later.");
+        setHeatmapData([]); // Clear old data on error
       } finally {
         setLoading(false);
       }
     };
-
     loadHistoricalData();
   }, [timeRange]);
 
-  // Calculate overall statistics for the heatmap
   const heatmapStats = useMemo(() => {
-    if (heatmapData.length === 0) return null;
-    
-    const nonZeroData = heatmapData.filter(d => d.avg_fee > 0);
-    if (nonZeroData.length === 0) return null;
-    
-    const fees = nonZeroData.map(d => d.avg_fee);
-    const minFee = Math.min(...fees);
-    const maxFee = Math.max(...fees);
-    const totalFees = fees.reduce((sum, fee) => sum + fee, 0);
-    const avgFee = totalFees / fees.length;
-    
-    return { minFee, maxFee, avgFee };
+    if (!heatmapData || heatmapData.length === 0) return null;
+    const fees = heatmapData.filter(d => d.avg_fee > 0).map(d => d.avg_fee);
+    if (fees.length === 0) return null;
+    return {
+      minFee: Math.min(...fees),
+      maxFee: Math.max(...fees),
+      avgFee: fees.reduce((sum, fee) => sum + fee, 0) / fees.length,
+    };
   }, [heatmapData]);
 
-  // Enhanced heatmap configuration
-  const config = {
+const config = {
     data: heatmapData,
-    xField: 'hour',
-    yField: 'day',
+    xField: 'hour',    
+    yField: 'day',     
     colorField: 'avg_fee',
-    color: ({ avg_fee }) => {
-      if (avg_fee === 0) return '#f0f0f0'; // Light grey for zero/no data
-      if (avg_fee < 10) return '#52c41a'; // Low fee (Green)
-      if (avg_fee < 30) return '#faad14'; // Medium fee (Yellow/Orange)
-      return '#ff4d4f'; // High fee (Red)
-    },
-    meta: {
-      day: {
-        type: 'cat',
-        values: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        alias: 'Day'
+    legend: {},
+    mark: 'cell',
+    axis: {
+      x:{
+        title: 'Hour of the day',
       },
-      hour: {
-        type: 'cat',
-        alias: 'Hour (UTC)'
-      },
-      avg_fee: {
-        alias: 'Avg Fee',
-        formatter: (val) => val === 0 ? 'No data' : `${val.toFixed(1)} sat/vB`,
-      },
-    },
-    tooltip: {
-      title: (title, datum) => {
-        const day = datum?.day || '';
-        const hour = datum?.hour !== undefined ? String(datum.hour).padStart(2, '0') : '';
-        return `${day}, ${hour}:00 UTC`;
-      },
-      formatter: (datum) => {
-        const fee = datum.avg_fee;
-        return {
-          name: 'Average Fee',
-          value: fee === 0 ? 'No data available' : `${fee.toFixed(1)} sat/vB`
-        };
-      },
-      customContent: (title, items) => {
-        if (!items || items.length === 0) return null;
-        
-        const item = items[0];
-        const fee = item.value;
-        let status = '';
-        let tip = '';
-        
-        if (fee === 0) {
-          status = 'No data';
-          tip = 'No transaction data available for this time period';
-        } else if (fee < 10) {
-          status = 'Low fee period';
-          tip = 'Best time for cost-effective transactions';
-        } else if (fee < 30) {
-          status = 'Medium fee period';
-          tip = 'Average network fee conditions';
-        } else {
-          status = 'High fee period';
-          tip = 'Consider waiting for lower fee opportunities';
-        }
-        
-        return (
-          <div style={{ 
-            background: '#fff', 
-            padding: '12px',
-            border: '1px solid #ddd',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>{title}</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-              <span>Fee Rate:</span>
-              <span style={{ fontWeight: 500 }}>{fee}</span>
-            </div>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between',
-              padding: '4px 8px',
-              background: fee < 10 ? '#f6ffed' : fee < 30 ? '#fffbe6' : '#fff2f0',
-              borderRadius: '4px',
-              marginBottom: 8
-            }}>
-              <span>Status:</span>
-              <span style={{ fontWeight: 500, color: fee < 10 ? '#52c41a' : fee < 30 ? '#faad14' : '#ff4d4f' }}>
-                {status}
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: '#666' }}>{tip}</div>
-          </div>
-        );
+      y:{
+        title: 'Day',
       }
     },
-    xAxis: {
-      title: { text: 'Hour of Day (UTC)', style: { fontSize: 12 } },
-      label: {
-        autoHide: false,
-        autoRotate: false,
-        formatter: (val) => String(val).padStart(2, '0'),
-        style: { fontSize: 10 }
-      },
-    },
-    yAxis: {
-      title: { text: 'Day of Week', style: { fontSize: 12 } },
-      label: { style: { fontSize: 10 } },
-    },
-    label: {
-      offset: -2,
-      style: {
-        fill: '#fff',
-        fontSize: 9,
-        shadowBlur: 2,
-        shadowColor: 'rgba(0, 0, 0, 0.45)',
-      },
-      formatter: (datum) => datum.avg_fee > 0 ? datum.avg_fee.toFixed(0) : '',
-    },
-    interactions: [{ type: 'element-active' }],
   };
 
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: '16px'}}>
         <div>
-          <Title level={5} style={{ margin: 0 }}>Network Fee Hotspots</Title>
-          <Text type="secondary">
-            Visualize when fees are typically lowest for cost-effective transactions
-          </Text>
+          <Title level={5} style={{ margin: 0 }}>Network Fee Hotspots </Title>
+          <Text type="secondary">Find the best time to send by seeing when fees are typically high or low.</Text>
         </div>
-        <Segmented 
-          options={['Last 7 Days', 'Last 30 Days']} 
-          value={timeRange} 
-          onChange={setTimeRange} 
-        />
+        <Segmented options={['Last 7 Days', 'Last 30 Days']} value={timeRange} onChange={setTimeRange} />
       </div>
+
+      {loading && <Skeleton active paragraph={{ rows: 10 }} />}
       
-      {heatmapStats && (
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col span={8}>
-            <Card size="small" hoverable>
-              <Statistic
-                title="Lowest Observed Fee"
-                value={heatmapStats.minFee.toFixed(1)}
-                suffix="sat/vB"
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" hoverable>
-              <Statistic
-                title="Average Fee"
-                value={heatmapStats.avgFee.toFixed(1)}
-                suffix="sat/vB"
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card size="small" hoverable>
-              <Statistic
-                title="Peak Fee"
-                value={heatmapStats.maxFee.toFixed(1)}
-                suffix="sat/vB"
-                valueStyle={{ color: '#ff4d4f' }}
-              />
-            </Card>
-          </Col>
-        </Row>
-      )}
+      {!loading && error && <Alert message="Error Loading Data" description={error} type="error" showIcon />}
       
-      <Skeleton loading={loading} active paragraph={{ rows: 8 }}>
-        {error && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
-        
-        {heatmapData.length > 0 ? (
-          <div style={{ position: 'relative' }}>
-            <div style={{ height: 350 }}>
-              <Heatmap {...config} />
-            </div>
-            
-            {/* Custom Legend */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              marginTop: 16,
-              flexWrap: 'wrap',
-              gap: 16
-            }}>
-              {[
-                { color: '#f0f0f0', label: 'No data', description: 'No transactions recorded' },
-                { color: '#52c41a', label: 'Low fee (<10 sat/vB)', description: 'Ideal for transactions' },
-                { color: '#faad14', label: 'Medium fee (10-30 sat/vB)', description: 'Average network conditions' },
-                { color: '#ff4d4f', label: 'High fee (≥30 sat/vB)', description: 'Consider waiting if possible' }
-              ].map((item, index) => (
-                <div key={index} style={{ display: 'flex', alignItems: 'center' }}>
-                  <div style={{
-                    width: 16,
-                    height: 16,
-                    backgroundColor: item.color,
-                    marginRight: 8,
-                    border: '1px solid #ddd'
-                  }} />
-                  <div>
-                    <Text strong style={{ fontSize: 12 }}>{item.label}</Text>
-                    <Text type="secondary" style={{ display: 'block', fontSize: 11 }}>{item.description}</Text>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {!loading && !error && heatmapData.length > 0 && (
+        <>
+          {heatmapStats && (
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col xs={24} sm={8}><Card size="small"><Statistic title="Lowest Fee" value={heatmapStats.minFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#38A169' }} /></Card></Col>
+              <Col xs={24} sm={8}><Card size="small"><Statistic title="Average Fee" value={heatmapStats.avgFee.toFixed(1)} suffix="sat/vB" /></Card></Col>
+              <Col xs={24} sm={8}><Card size="small"><Statistic title="Peak Fee" value={heatmapStats.maxFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#E53E3E' }} /></Card></Col>
+            </Row>
+          )}
+
+          <div style={{ height: 350, position: 'relative' , background: 'white'}}>
+            <Heatmap {...config} />
           </div>
-        ) : (
-          !loading && !error && (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              height: 350,
-              background: '#fafafa',
-              borderRadius: 4,
-              border: '1px dashed #ddd',
-              marginTop: 16
-            }}>
-              <PieChartOutlined style={{ fontSize: 48, color: '#bfbfbf', marginBottom: 16 }} />
-              <Text type="secondary">No historical data available for the selected period</Text>
-              <Text type="secondary" style={{ marginTop: 8 }}>Try selecting a different time range</Text>
-            </div>
-          )
-        )}
-      </Skeleton>
-      
-      {heatmapData.length > 0 && (
-        <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 4 }}>
-          <Text>
-            <strong>Tip:</strong> For standard transactions, aim for the green periods where fees are typically below 10 sat/vB. 
-            High-value transactions may prioritize security over fee savings.
-          </Text>
-        </div>
+
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <Text type="secondary">
+              Hover over a block to see the average fee for that hour.
+            </Text>
+          </div>
+        </>
       )}
+      
+       {!loading && !error && heatmapData.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '48px 0' }}>
+            <PieChartOutlined style={{ fontSize: 48, color: '#bfbfbf' }} />
+            <Title level={5} style={{ marginTop: 16 }}>No Historical Data Available</Title>
+            <Text type="secondary">There is no fee data to display for the selected time period.</Text>
+        </div>
+       )}
     </>
   );
 };
 
-const CombinedFeeView = () => (
-  <Card>
-    <Tabs defaultActiveKey="1">
-      <TabPane tab={<><PieChartOutlined />Current Mempool</>} key="1">
-        <CurrentMempoolVisualizer />
-      </TabPane>
-      <TabPane tab={<><ClockCircleOutlined />Historical Patterns</>} key="2">
-        <HistoricalFeeHeatmap />
-      </TabPane>
-    </Tabs>
-  </Card>
-);
+// Main Component: The Combined View with the corrected Tabs API
+const CombinedFeeView = () => {
+  const items = [
+    {
+      key: '1',
+      label: <><PieChartOutlined /> Current Mempool</>,
+      children: <CurrentMempoolVisualizer />,
+    },
+    {
+      key: '2',
+      label: <><ClockCircleOutlined /> Historical Patterns</>,
+      children: <HistoricalFeeHeatmap />,
+    },
+  ];
+
+  return (
+    <Card>
+      <Tabs defaultActiveKey="1" items={items} />
+    </Card>
+  );
+};
 
 export default CombinedFeeView;

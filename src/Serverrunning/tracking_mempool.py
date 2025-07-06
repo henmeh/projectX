@@ -16,7 +16,7 @@ if __name__ == "__main__":
         whaletracking = WhaleTracking(node=raspi)
         mempool = Mempool(node=raspi)
         while True:
-            whaletracking.process_mempool_transactions()
+            #whaletracking.process_mempool_transactions()
             whaletracking.delete_mined_mempool_transactions()
             mempool.get_mempool_feerates()
             

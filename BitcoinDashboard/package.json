@@ -12,6 +12,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
     "@ant-design/plots": "^2.3.3",
+    "@nivo/heatmap": "^0.99.0",
     "antd": "^5.26.2",
     "axios": "^1.10.0",
     "moment": "^2.30.1",
