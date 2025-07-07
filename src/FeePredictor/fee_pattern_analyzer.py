@@ -1,4 +1,3 @@
-'''
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
@@ -547,4 +546,3 @@ if __name__ == "__main__":
 
     else:
         print("\nCould not load model. Prediction process aborted.")
-'''
