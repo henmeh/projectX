@@ -1,0 +1,30 @@
+.dashboard-content {
+  padding: 16px;
+  overflow: auto;
+  height: calc(100vh - 64px);
+  background-color: var(--bg-color);
+}
+
+.dashboard-card {
+  background-color: var(--bg-color);
+  border-color: var(--bg-color);
+}
+
+.dashboard-row {
+  margin-bottom: 24px;
+}
+
+.dashboard-col {
+  width: 100%;
+}
+
+@media (min-width: 992px) {
+  .dashboard-row {
+    display: flex;
+    gap: 24px;
+  }
+  
+  .dashboard-col {
+    flex: 1;
+  }
+}

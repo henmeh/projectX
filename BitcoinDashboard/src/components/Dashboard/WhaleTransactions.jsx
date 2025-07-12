@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, InputNumber, Typography } from 'antd';
 import { fetchWhaleTransactions } from '../../services/api';
+import './Dashboard.css';
+import './WhaleTransactions.css'
+
 
 const { Title } = Typography;
 

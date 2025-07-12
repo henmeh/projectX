@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Radio } from 'antd';
 import { ClockCircleOutlined, PieChartOutlined } from '@ant-design/icons';
 import { Heatmap } from '@ant-design/plots';
+import "./Dashboard.css";
+import "./FeePressureMap.css"
 
 
 // Import API functions
@@ -74,7 +76,7 @@ const CurrentMempoolVisualizer = () => {
             </Card>
           </Col>
           <Col xs={24} lg={12}>
-            <Card title="Totla vSize" className="data-card">
+            <Card title="Total vSize" className="data-card">
               <Statistic value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
             </Card>
           </Col>

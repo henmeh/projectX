@@ -4,6 +4,7 @@
   position: auto;
   left: 0;
   display: flex;
+  background: var(--dark-sider-bg);
 }
 
 .mobile-sidebar-header {

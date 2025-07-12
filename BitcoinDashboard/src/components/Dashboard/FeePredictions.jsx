@@ -3,6 +3,8 @@ import { Card, Typography, Row, Col, Statistic, Radio, Select, Space } from 'ant
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { fetchFeeEstimation, fetchFeePrediction } from '../../services/api';
 import moment from 'moment'; // Make sure to install moment: npm install moment or yarn add moment
+import './Dashboard.css'
+import './FeePredictions.css'
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -95,11 +97,6 @@ const FeePredictions = () => {
       if (!chartData || chartData.length === 0) return null;
       return chartData[0]; // The first entry is the earliest future prediction
   }, [chartData]);
-
-
-  // IMPORTANT: The `getPredictionAccuracy` function has been removed.
-  // Accuracy can only be calculated for historical data (where you have both actual and predicted values for the same past timestamp).
-  // For *future* predictions, we do not have the 'current' actual fee for that future time yet.
 
 
   // Custom tooltip rendering for the chart

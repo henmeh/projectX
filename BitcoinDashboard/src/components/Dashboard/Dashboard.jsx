@@ -6,6 +6,8 @@ import FeeCards from './FeeCards';
 import FeePredictions from './FeePredictions';
 import FeePressureMap from './FeePressureMap';
 import { useAppContext } from '../../context/AppContext';
+import './Dashboard.css';
+
 
 const { Content } = Layout;
 

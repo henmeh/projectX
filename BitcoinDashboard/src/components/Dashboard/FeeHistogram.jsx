@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, Typography, Row, Col, Statistic, Alert, Skeleton } from 'antd';
 import { BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AreaChartOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import "./Dashboard.css"
 
 // Importing from your services/api.js file
 import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolInsights } from '../../services/api';
@@ -39,7 +40,7 @@ const MempoolOverview = () => {
 
     try {
       // ✨ NEW: Fetch all data in parallel for faster loading
-      const [histogramRes, insightsRes, estimationRes] = await Promise.all([
+      const [histogramRes, insightsRes, _] = await Promise.all([
         fetchFeeHistogram(),
         fetchMempoolInsights(),
         fetchFeeEstimation()
