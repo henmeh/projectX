@@ -26,7 +26,7 @@ const MempoolOverview = () => {
   // --- STATE MANAGEMENT ---
   const [feeHistogramData, setFeeHistogramData] = useState([]);
   const [mempoolInsightsData, setMempoolInsightsData] = useState([]);
-  const [feeEstimation, setFeeEstimation] = useState(null);
+  //const [feeEstimation, setFeeEstimation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -65,7 +65,7 @@ const MempoolOverview = () => {
       }
 
       // Process Fee Estimation
-      setFeeEstimation(estimationRes);
+      //setFeeEstimation(estimationRes);
 
     } catch (err) {
       console.error("Failed to load dashboard data:", err);
@@ -98,7 +98,7 @@ const MempoolOverview = () => {
       const data = payload[0].payload;
       const percentage = totalHistogramTransactions > 0 ? (data.count / totalHistogramTransactions * 100).toFixed(2) : 0;
       return (
-        <div className="custom-tooltip" style={{ background: 'rgba(255, 255, 255, 0.9)', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+        <div>
           <Text strong>{`${data.fee} sat/vB`}</Text><br />
           <Text>Transactions: {data.count.toLocaleString()}</Text><br />
           <Text type="secondary">{percentage}% of mempool Txs</Text>
@@ -114,7 +114,7 @@ const MempoolOverview = () => {
       const feeData = payload.find(p => p.dataKey === 'avg_fee_per_vbyte');
 
       return (
-        <div className="custom-tooltip" style={{ background: 'rgba(255, 255, 255, 0.9)', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+        <div>
           <Text strong>Value Sent: {label}</Text><br />
           {vsizeData && <Text style={{ color: vsizeData.color }}>Total VSize: {(vsizeData.value / 1_000_000).toFixed(2)} MB</Text>}<br />
           {feeData && <Text style={{ color: feeData.color }}>Avg. Fee: {feeData.value.toFixed(2)} sat/vB</Text>}
@@ -127,7 +127,7 @@ const MempoolOverview = () => {
   // --- RENDER LOGIC ---
   return (
     <Card 
-      title={<Title level={3} style={{ marginTop: 0 }}>Bitcoin Mempool Insights</Title>}
+      title={<Title level={4} style={{ margin: 0 }}>Mempool Insights</Title>}
       className="dashboard-card"
       loading={loading}
     >
@@ -135,20 +135,27 @@ const MempoolOverview = () => {
       
       {error && <Alert message="Network Error" description={error} type="warning" showIcon closable style={{ marginTop: 16 }} />}
 
-      <Row gutter={[16, 16]} style={{ marginTop: 24, marginBottom: 24 }}>
-        <Col xs={24} sm={12} lg={8}>
-          <Statistic title="Total Mempool Size" value={(summaryStats.totalVsize / 1000000).toFixed(2)} suffix="MB" />
+      <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
+        <Col xs={24} lg={12}>
+          <Card title="Total Mempool Size" className="data-card">
+            <Statistic value={(summaryStats.totalVsize / 1000000).toFixed(2)} suffix="MB" />
+          </Card>
         </Col>
-        <Col xs={24} sm={12} lg={8}>
-          <Statistic title="Transactions in Mempool" value={summaryStats.totalTransactions.toLocaleString()} />
+        <Col xs={24} lg={12}>
+          <Card title="Transactions in Mempool" className="data-card">
+            <Statistic value={summaryStats.totalTransactions.toLocaleString()} />
+          </Card>
         </Col>
-        <Col xs={24} sm={12} lg={8}>
+        {/*
+        <Col xs={24} lg={8} style={{ display: 'flex' }}>
+        <Card title="Recommended Fees (sat/vB)" className="data-card">
           <Statistic
-            title="Recommended Fees (sat/vB)"
             value={feeEstimation ? `${feeEstimation.fast_fee.toFixed(0)}` : '--'}
             suffix={feeEstimation ? ` (Fast) / ${feeEstimation.medium_fee.toFixed(0)} (Med) / ${feeEstimation.low_fee.toFixed(0)} (Low)`  : ''}
           />
+        </Card>
         </Col>
+        */}
       </Row>
 
       <Row gutter={[24, 24]}>

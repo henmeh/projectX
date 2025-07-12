@@ -28,22 +28,22 @@ const Sidebar = () => {
     { 
       key: 'whale-transactions', 
       icon: <DollarOutlined />, 
-      label: 'Mempool Transactions' 
+      //label: 'Mempool Transactions' 
     },
     { 
       key: 'fee-histogram', 
       icon: <BarChartOutlined />, 
-      label: 'Mempool Insights' 
+      //label: 'Mempool Insights' 
     },
     { 
       key: 'fee-predictions', 
       icon: <RocketOutlined />, 
-      label: 'Fee Statistics' 
+      //label: 'Fee Statistics' 
     },
     { 
       key: 'fee-pressure', 
       icon: <HeatMapOutlined />, 
-      label: 'Fee Pressure Map' 
+      //label: 'Fee Pressure Map' 
     },
   ];
   
@@ -65,12 +65,12 @@ const Sidebar = () => {
   
   return (
     <Sider 
+      className={`sidebar ${darkMode ? 'dark' : 'light'}`}
       collapsible
       collapsed={sidebarCollapsed}
-      className={`sidebar ${darkMode ? 'dark' : 'light'}`}
       trigger={null}
       style={isMobile ? mobileSidebarStyle : {}}
-      width={isMobile ? '80%' : undefined}
+      width={isMobile ? '80%' : 'undefined'}
     >
       {isMobile && (
         <div className="mobile-sidebar-header">

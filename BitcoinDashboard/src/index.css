@@ -4,15 +4,12 @@
   --warning-color: #faad14;
   --error-color: #ff4d4f;
   
-  --dark-bg: #141414;
+  --bg-color: #111111;
+  --dark-bg: #1f1f1f;
   --dark-sider-bg: #1f1f1f;
-  --dark-card-bg: #262626;
+  --dark-top-bg: #1f1f1f;
+  --dark-card-bg: #141414;
   --dark-text: #e6e6e6;
-  
-  --light-bg: #f0f2f5;
-  --light-sider-bg: #ffffff;
-  --light-card-bg: #ffffff;
-  --light-text: #262626;
 }
 
 * {
@@ -29,48 +26,16 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-}
+  background-color: var(--bg-color);
 
-.app-layout {
-  min-height: 100vh;
-}
-
-/* Topbar styles */
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 24px;
-  height: 64px;
-  line-height: 64px;
-  z-index: 1;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
 }
 
 .topbar.dark {
-  background: var(--dark-bg);
-  color: var(--dark-text);
-  border-bottom: 1px solid #303030;
-}
-
-.topbar.light {
-  background: #fff;
-  color: var(--light-text);
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
+  background: var(--dark-top-bg);
 }
 
 .menu-toggle {
   margin-right: 16px;
-}
-
-.app-name {
-  font-size: 18px;
-  font-weight: 600;
 }
 
 .user-menu {
@@ -82,24 +47,16 @@ body {
   background: var(--dark-sider-bg);
 }
 
-.sidebar.light {
-  background: var(--light-sider-bg);
-}
-
-.logo {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: bold;
-  color: var(--primary-color);
-}
 
 /* Dashboard styles */
 .dashboard-content {
   padding: 24px;
   overflow: auto;
+}
+
+.dashboard-card {
+  background-color: var(--bg-color);
+  border-color: var(--bg-color);
 }
 
 .dashboard-row {
@@ -119,15 +76,6 @@ body {
   .dashboard-col {
     flex: 1;
   }
-}
-
-.dashboard-card {
-  margin-bottom: 24px;
-  height: 100%;
-}
-
-.dashboard-card .ant-card-head {
-  border-bottom: none;
 }
 
 /* Fee cards */
@@ -175,12 +123,6 @@ body {
 
 .prediction-card .ant-statistic-content {
   font-size: 24px;
-}
-
-.accuracy {
-  margin-top: 8px;
-  font-size: 14px;
-  color: #888;
 }
 
 /* Congestion indicator */
@@ -234,4 +176,11 @@ body {
 /* Heatmap */
 .g2-tooltip {
   box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* New class for cards that contain charts or stats */
+.data-card {
+  background-color: var(--dark-bg);
+  width: 100%;
+  height: 100%;
 }

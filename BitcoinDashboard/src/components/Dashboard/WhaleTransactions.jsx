@@ -50,6 +50,7 @@ const WhaleTransactions = () => {
   
   return (
     <Card 
+      className="dashboard-card"
       title={<Title level={4} style={{ margin: 0 }}>Whale Transactions</Title>}
       extra={
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -62,7 +63,6 @@ const WhaleTransactions = () => {
           />
         </div>
       }
-      className="dashboard-card"
     >
       <Table 
         dataSource={transactions} 

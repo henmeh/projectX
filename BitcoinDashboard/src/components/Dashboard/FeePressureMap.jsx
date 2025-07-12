@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Segmented } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Radio } from 'antd';
 import { ClockCircleOutlined, PieChartOutlined } from '@ant-design/icons';
 import { Heatmap } from '@ant-design/plots';
-import { ResponsiveHeatMap } from '@nivo/heatmap'
 
 
 // Import API functions
@@ -68,32 +67,40 @@ const CurrentMempoolVisualizer = () => {
     <Skeleton loading={loading} active paragraph={{ rows: 8 }}>
       {error && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
       {congestionStatus && (
-        <Row gutter={16} style={{ marginBottom: 24 }} align="middle">
-          <Col xs={24} sm={8}>
-            <Statistic title="Mempool Status" value=" " prefix={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
+        <Row gutter={[24, 241]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
+          <Col xs={24} lg={12}>
+            <Card title="Mempool Status" className="data-card">
+              <Statistic value=" " prefix={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
+            </Card>
           </Col>
-          <Col xs={24} sm={8}>
-            <Statistic title="Total vSize" value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
+          <Col xs={24} lg={12}>
+            <Card title="Totla vSize" className="data-card">
+              <Statistic value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
+            </Card>
           </Col>
         </Row>
       )}
-      <Title level={5}>Mempool Blocks</Title>
-      <Text type="secondary">A real-time view of data waiting in the mempool, organized into 1MB blocks.</Text>
-      <div className="mempool-blocks-container">
-        {mempoolBlocks.map((block, index) => {
-          const percentage = Math.min((block.v_size / BLOCK_VSIZE_LIMIT) * 100, 100);
-          return (
-            <div key={index} className="mempool-block">
-              <div className="block-header">
-                <Text strong>{index === 0 ? 'Next Block' : `Block #${index + 1}`}</Text>
-                <Text type="secondary">{getBlockFeeRange(block.fees)}</Text>
+      <Card
+        title={<Title level={4} style={{ margin: 0 }}>Mempool Blocks</Title>}
+        className="dashboard-card"
+      >
+        <Text type="secondary">A real-time view of data waiting in the mempool, organized into 1MB blocks.</Text>
+        <div className="mempool-blocks-container">
+          {mempoolBlocks.map((block, index) => {
+            const percentage = Math.min((block.v_size / BLOCK_VSIZE_LIMIT) * 100, 100);
+            return (
+              <div key={index} className="mempool-block">
+               <div className="block-header">
+                  <Text strong>{index === 0 ? 'Next Block' : `Block #${index + 1}`}</Text>
+                  <Text type="secondary">{getBlockFeeRange(block.fees)}</Text>
+                </div>
+                <Progress percent={percentage} strokeColor={percentage > 95 ? '#ff4d4f' : percentage > 70 ? '#faad14' : '#52c41a'} format={() => `${(block.v_size / 1000000).toFixed(2)} MB`} />
               </div>
-              <Progress percent={percentage} strokeColor={percentage > 95 ? '#ff4d4f' : percentage > 70 ? '#faad14' : '#52c41a'} format={() => `${(block.v_size / 1000000).toFixed(2)} MB`} />
-            </div>
-          );
-        })}
-        {!mempoolBlocks.length && !loading && !error && <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginTop: 32 }}>Mempool is currently empty.</Text>}
-      </div>
+            );
+          })}
+          {!mempoolBlocks.length && !loading && !error && <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginTop: 32 }}>Mempool is currently empty.</Text>}
+        </div>
+      </Card>
     </Skeleton>
   );
 };
@@ -147,26 +154,38 @@ const config = {
     xField: 'hour',    
     yField: 'day',     
     colorField: 'avg_fee',
-    legend: {},
+    //legend: {},
     mark: 'cell',
     axis: {
-      x:{
-        title: 'Hour of the day',
+      x: {
+        title: "Hour of the day",
+        titleFill: "#e6e6e6",
+        labelFontSize: 12,
+        labelFill: "#e6e6e6"
       },
-      y:{
-        title: 'Day',
+      y: {
+        title: "Day",
+        titleFill: "#e6e6e6",
+        labelFontSize: 12,
+        labelFill: "#e6e6e6"
       }
-    },
+    }
   };
 
   return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: '16px'}}>
-        <div>
-          <Title level={5} style={{ margin: 0 }}>Network Fee Hotspots </Title>
-          <Text type="secondary">Find the best time to send by seeing when fees are typically high or low.</Text>
-        </div>
-        <Segmented options={['Last 7 Days', 'Last 30 Days']} value={timeRange} onChange={setTimeRange} />
+    <Card
+    className='dashboard-card'
+    title={<Title level={4} style={{ margin: 0 }}>Network Fee Hotspots</Title>}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <Text type="secondary">Find the best time to send by seeing when fees are typically high or low.</Text>
+        <Radio.Group
+          options={['Last 7 Days', 'Last 30 Days']}
+          value={timeRange}
+          onChange={(e) => setTimeRange(e.target.value)}
+          optionType="button"
+          buttonStyle="solid"
+        />
       </div>
 
       {loading && <Skeleton active paragraph={{ rows: 10 }} />}
@@ -183,15 +202,20 @@ const config = {
             </Row>
           )}
 
-          <div style={{ height: 350, position: 'relative' , background: 'white'}}>
-            <Heatmap {...config} />
-          </div>
+          <Card 
+            className="data-card"
+            title={<Title level={4} style={{ margin: 0 }}> Fee Hotspots </Title>}
+          >
+            <div style={{ height: 350, position: 'relative'}}>
+              <Heatmap {...config} />
+            </div>
 
-          <div style={{ textAlign: 'center', marginTop: 16 }}>
-            <Text type="secondary">
-              Hover over a block to see the average fee for that hour.
-            </Text>
-          </div>
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <Text type="secondary">
+                Hover over a block to see the average fee for that hour.
+              </Text>
+            </div>
+          </Card>
         </>
       )}
       
@@ -202,7 +226,7 @@ const config = {
             <Text type="secondary">There is no fee data to display for the selected time period.</Text>
         </div>
        )}
-    </>
+    </Card>
   );
 };
 
@@ -222,7 +246,7 @@ const CombinedFeeView = () => {
   ];
 
   return (
-    <Card>
+    <Card className="dashboard-card">
       <Tabs defaultActiveKey="1" items={items} />
     </Card>
   );
