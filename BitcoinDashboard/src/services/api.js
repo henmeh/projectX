@@ -84,3 +84,13 @@ export const fetchMempoolInsights = async () => {
     return [];
   }
 };
+
+export const fetchFeePattern = async () => {
+  try {
+    const response = await api.get('/fee-pattern'); // Matches Flask endpoint
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching fee pattern:', error);
+    return [];
+  }
+};

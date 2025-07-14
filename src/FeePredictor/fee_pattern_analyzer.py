@@ -6,6 +6,8 @@ import datetime
 import psycopg2
 from psycopg2 import Error as Psycopg2Error
 import joblib # For saving/loading models
+import itertools # Add this import at the top of your file
+from operator import itemgetter # Add this import as well
 
 class FeePatternAnalyzer:
     """
@@ -468,81 +470,112 @@ class FeePatternAnalyzer:
 
             patterns_summary[category] = category_descriptions
         return patterns_summary
+    
+
+    # (Inside your FeePatternAnalyzer class)
+    def store_fee_pattern(self):
+        """
+        Finds continuous blocks of hours for each fee category and stores these compact
+        ranges in a PostgreSQL database. The stored end_hour is exclusive.
+        """
+        if not self.cluster_summary:
+            print("Analysis results not found. Cannot store patterns. Run analysis first.")
+            return
+
+        conn = None
+        
+        records_to_insert = []
+        analyze_time = datetime.datetime.now()
+
+        try:
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+
+            for category, info in self.cluster_summary.items():
+                category_avg_fee = info.get('avg_fee', 0.0)
+                
+                times_by_day = sorted(info.get('times_in_category', []), key=itemgetter('day_of_week_num'))
+                for day_num, day_slots in itertools.groupby(times_by_day, key=itemgetter('day_of_week_num')):
+                    
+                    hours = sorted([slot['hour_of_day'] for slot in day_slots])
+                    if not hours:
+                        continue
+
+                    for _, group in itertools.groupby(enumerate(hours), lambda x: x[0] - x[1]):
+                        hour_block = [item[1] for item in group]
+                        start_hour = hour_block[0]
+                        end_hour = hour_block[-1] + 1
+                        
+                        records_to_insert.append((
+                            analyze_time,
+                            category,
+                            day_num,
+                            start_hour,
+                            end_hour,
+                            float(category_avg_fee)
+                        ))
+            
+            if not records_to_insert:
+                print("No pattern data available to store.")
+                return
+
+            insert_query = """
+            INSERT INTO fee_pattern (analysis_timestamp, fee_category, day_of_week_num, start_hour, end_hour, avg_fee_for_category)
+            VALUES (%s, %s, %s, %s, %s, %s);
+            """
+            cursor.executemany(insert_query, records_to_insert)
+            conn.commit()
+
+            print(f"✅ Successfully stored {len(records_to_insert)} compact fee pattern ranges in the database.")
+
+
+        except (Exception, Psycopg2Error) as error:
+            print(f"❌ Error during database operation: {error}")
+            if conn:
+                conn.rollback()
+        finally:
+            if conn:
+                cursor.close()
+                conn.close()
 
 
 # --- Example Usage (demonstrates how to call the class) ---
 if __name__ == "__main__":
-    # IMPORTANT: Replace with your actual PostgreSQL database configuration
-    # In a production environment, use environment variables or a secure configuration system
+    # IMPORTANT: Replace with your actual PostgreSQL database configuration.
+    # In a production environment, use environment variables or a secure configuration system.
     db_config = {
-        'host': 'localhost', # e.g., 'localhost' or an IP address
+        'host': 'localhost',        # e.g., 'localhost' or an IP address
         'database': 'bitcoin_blockchain',
         'user': 'postgres',
         'password': 'projectX',
-        'port': 5432 # Default PostgreSQL port
+        'port': 5432                # Default PostgreSQL port
     }
 
-    # Initialize the analyzer. It will look for models in the current directory.
-    # Set n_clusters to 3 for 'Low', 'Medium', 'High' categories.
+    # Initialize the analyzer.
     analyzer = FeePatternAnalyzer(db_config, data_interval='6 months', n_clusters=3)
 
-    # --- Scenario 1: Train the model (e.g., when your application starts for the first time, or periodically) ---
-    # This will fetch data from the DB, train the model, and save the model files.
-    print("\n----- Running Training Process -----")
+    # --- Step 1: Run the analysis to train a new model ---
+    # This ensures we are working with the latest fee patterns from the database.
+    print("\n----- Running Fee Pattern Analysis -----")
     if analyzer.run(train_model=True):
-        print("\nTraining successful. Model is ready and saved for future use.")
-    else:
-        print("\nTraining failed. Check database connection, credentials, and if data exists.")
-        print("Exiting example as model is not ready.")
-        exit() # Exit if training fails, as subsequent steps depend on a trained model
+        print("\nAnalysis successful. Model is trained and ready.")
 
-    # --- Scenario 2: Load the model and make predictions (e.g., in a production API endpoint) ---
-    # In a real API, you'd typically run `analyzer.run(train_model=False)` once when the server starts.
-    # Subsequent API calls would then directly use `predict_fee_category` or `get_low_fee_recommendations`.
-    print("\n----- Running Prediction Process (Loading Model) -----")
-    # You could re-initialize analyzer here if this was a separate process/server restart
-    # analyzer_predictor = FeePatternAnalyzer(db_config) # Re-instantiate
-    if analyzer.run(train_model=False): # Attempt to load the previously saved model
-        print("\nModel loaded successfully. Ready to serve predictions and patterns.")
-
-        # --- Demonstrate Broad Pattern Extraction ---
+        # --- Step 2: Display the overall patterns for each fee category ---
         print("\n--- Overall Historical Fee Patterns ---")
         overall_patterns = analyzer.get_overall_fee_patterns()
-        for category, descriptions in overall_patterns.items():
-            print(f"\n{category} Times:")
-            for desc in descriptions:
-                print(f"  {desc}")
 
-        # --- Demonstrate Specific Prediction (similar to previous example) ---
-        # Get current time in Aalen, then convert to UTC for consistency with DB data
-        now_aalen = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=2))) # Aalen is CEST, UTC+2
-        current_time_utc = now_aalen.astimezone(datetime.timezone.utc)
-
-        print(f"\n\n--- Specific Time Prediction ---")
-        print(f"Current UTC Time: {analyzer.day_names[(current_time_utc.weekday() + 1) % 7]} {current_time_utc.hour:02}:00 UTC")
-
-        # Predict for current hour
-        current_day_num = (current_time_utc.weekday() + 1) % 7
-        current_hour = current_time_utc.hour
-        predicted_category_now = analyzer.predict_fee_category(current_day_num, current_hour)
-        print(f"Predicted Category for right now: {predicted_category_now}")
-
-        # Predict for a specific future time (e.g., next Wednesday at 15:00 UTC)
-        # Remember DOW: 0=Sunday, 1=Monday, ..., 6=Saturday
-        future_day_num = 3 # Wednesday
-        future_hour = 15  # 15:00 UTC
-        print(f"\nPredicting fee category for {analyzer.day_names[future_day_num]} {str(future_hour).zfill(2)}:00 UTC:")
-        predicted_category_future = analyzer.predict_fee_category(future_day_num, future_hour)
-        print(f"Predicted Category: {predicted_category_future}")
-
-        # --- Demonstrate Low Fee Recommendations ---
-        print("\n--- Low Fee Recommendations for Next 24 Hours ---")
-        recommendations_24h = analyzer.get_low_fee_recommendations(num_hours_ahead=24)
-        if recommendations_24h:
-            for rec in recommendations_24h:
-                print(f"- {rec}")
+        if overall_patterns:
+            for category, descriptions in sorted(overall_patterns.items()):
+                print(f"\n{category} Times:")
+                for desc in descriptions:
+                    print(f"  {desc}")
         else:
-            print("No low fee recommendations available for the next 24 hours based on historical patterns.")
+            print("Could not retrieve overall fee patterns from the analysis.")
+
+        # --- Step 3: Store the newly identified patterns in the database ---
+        print("\n--- Storing Fee Patterns in PostgreSQL DB ---")
+        analyzer.store_fee_pattern()
 
     else:
-        print("\nCould not load model. Prediction process aborted.")
+        print("\nAnalysis failed. Check database connection and if sufficient data exists.")
+        print("Exiting, as the model could not be trained.")

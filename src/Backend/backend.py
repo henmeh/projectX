@@ -388,6 +388,26 @@ def get_mempool_insights():
     raise HTTPException(status_code=404, detail="No mempool-insights data available")
 
 
+@app.get('/fee-pattern')
+def get_fee_pattern():
+    """
+    Fetches the latest fee pattern from fee pattern table
+    """
+    query = """
+            SELECT 
+                *
+            FROM
+                fee_pattern
+            WHERE
+                analysis_timestamp = (SELECT MAX(analysis_timestamp) FROM fee_pattern);
+                """
+    result = fetch_data(query)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="No fee pattern data available")
+
+
+
 if __name__ == "__main__":
     # Run using: python this_file_name.py
     uvicorn.run(

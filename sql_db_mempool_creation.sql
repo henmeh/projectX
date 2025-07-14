@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS public.transactions_inputs CASCADE;
 DROP TABLE IF EXISTS public.transactions_outputs CASCADE;
 DROP TABLE IF EXISTS public.whale_balance_history CASCADE;
 DROP TABLE IF EXISTS public.whale_behavior CASCADE;
+DROP TABLE IF EXISTS public.fee_pattern CASCADE;
 
 DROP TABLE IF EXISTS mempool_value_insights CASCADE;
 
@@ -23,6 +24,18 @@ CREATE TABLE mempool_fee_histogram (
     medium_fee REAL,
     low_fee REAL
 ) TABLESPACE mempool;
+
+
+CREATE TABLE IF NOT EXISTS fee_pattern (
+    id SERIAL PRIMARY KEY,
+    analysis_timestamp TIMESTAMPTZ NOT NULL,
+    fee_category VARCHAR(50) NOT NULL,
+    day_of_week_num INT NOT NULL,
+    start_hour INT NOT NULL,
+    end_hour INT NOT NULL,
+    avg_fee_for_category NUMERIC(10, 2)
+) TABLESPACE mempool;
+
 
 -- Fee Prediction Table
 CREATE TABLE fee_predictions (
