@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, Typography, Row, Col, Statistic, Radio, Select, Space } from 'antd';
+import { Card, Typography, Row, Col, Statistic, Radio, Select, Space, Tabs } from 'antd';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchFeeEstimation, fetchFeePrediction } from '../../services/api';
+import { fetchFeeEstimation, fetchFeePrediction } from '../../../services/api';
 import moment from 'moment'; // Make sure to install moment: npm install moment or yarn add moment
-import './Dashboard.css'
+import '../Dashboard.css'
 import './FeePredictions.css'
 
 const { Title, Text } = Typography;

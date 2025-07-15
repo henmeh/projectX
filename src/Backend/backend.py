@@ -198,7 +198,7 @@ def get_fee_prediction(table_name: str = Path(..., description="The name of the 
             {table_name}
         WHERE
             generated_at = (SELECT MAX(generated_at) FROM {table_name})
-            AND prediction_time >= NOW() AT TIME ZONE 'UTC' -- Use NOW() AT TIME ZONE 'UTC' for robust timezone handling
+            --AND prediction_time >= NOW() AT TIME ZONE 'UTC' -- Use NOW() AT TIME ZONE 'UTC' for robust timezone handling
         ORDER BY
             prediction_time ASC, model_name ASC; -- Order for consistent display
     """

@@ -5,7 +5,7 @@ import { AreaChartOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-d
 import "./Dashboard.css"
 
 // Importing from your services/api.js file
-import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolInsights } from '../../services/api';
+import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolInsights, fetchMempoolCongestion } from '../../services/api';
 
 const { Title, Text } = Typography;
 
@@ -31,6 +31,9 @@ const MempoolOverview = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [congestionStatus, setCongestionStatus] = useState(null);
+  const [mempoolBlocks, setMempoolBlocks] = useState([]);
+  const BLOCK_VSIZE_LIMIT = 1000000;
 
   // --- DATA FETCHING ---
   const loadAllData = useCallback(async () => {
@@ -40,11 +43,19 @@ const MempoolOverview = () => {
 
     try {
       // ✨ NEW: Fetch all data in parallel for faster loading
-      const [histogramRes, insightsRes, _] = await Promise.all([
+      const [congestionData, histogramRes, insightsRes, _] = await Promise.all([
+        fetchMempoolCongestion(),
         fetchFeeHistogram(),
         fetchMempoolInsights(),
         fetchFeeEstimation()
       ]);
+      setCongestionStatus(congestionData);
+
+      if (!histogramRes?.histogram || !Array.isArray(histogramRes.histogram)) {
+        console.warn("Fee histogram data is missing or malformed, setting empty array.");
+        setMempoolBlocks([]);
+        return;
+      }
 
       // Process Fee Histogram
       if (histogramRes?.histogram) {
@@ -64,6 +75,41 @@ const MempoolOverview = () => {
         setMempoolInsightsData(transformed);
         setLastUpdated(transformed[0].generated_at);
       }
+
+      const sortedFeeLevels = histogramRes.histogram
+          .map(([fee, v_size]) => ({ fee: parseFloat(fee), v_size: parseInt(v_size) }))
+          .sort((a, b) => b.fee - a.fee);
+
+      const blocks = [];
+      let currentBlock = { v_size: 0, fees: [] };
+
+      for (const level of sortedFeeLevels) {
+        if (currentBlock.v_size + level.v_size > BLOCK_VSIZE_LIMIT && currentBlock.v_size > 0) {
+          blocks.push(currentBlock);
+          currentBlock = { v_size: 0, fees: [] };
+        }
+        currentBlock.v_size += level.v_size;
+        currentBlock.fees.push(level.fee);
+        }
+        if (currentBlock.v_size > 0) {
+          blocks.push(currentBlock);
+        }
+        setMempoolBlocks(blocks);
+
+  const getStatusColor = (status) => {
+    if (!status) return 'default';
+    const lowerStatus = status.toLowerCase();
+    if (lowerStatus === 'high') return 'error';
+    if (lowerStatus === 'medium') return 'warning';
+    return 'success';
+  };
+
+  const getBlockFeeRange = (fees) => {
+    if (!fees || fees.length === 0) return 'N/A';
+    const min = Math.min(...fees);
+    const max = Math.max(...fees);
+    return min === max ? `${min.toFixed(0)} sat/vB` : `${min.toFixed(0)} - ${max.toFixed(0)} sat/vB`;
+  };
 
       // Process Fee Estimation
       //setFeeEstimation(estimationRes);
@@ -137,6 +183,19 @@ const MempoolOverview = () => {
       {error && <Alert message="Network Error" description={error} type="warning" showIcon closable style={{ marginTop: 16 }} />}
 
       <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
+          <Col xs={24} lg={12}>
+            <Card title="Mempool Status" className="data-card">
+              <Statistic value=" " prefix={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card title="Total vSize" className="data-card">
+              <Statistic value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
+            </Card>
+          </Col>
+        </Row>
+
+      <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
         <Col xs={24} lg={12}>
           <Card title="Total Mempool Size" className="data-card">
             <Statistic value={(summaryStats.totalVsize / 1000000).toFixed(2)} suffix="MB" />
@@ -146,17 +205,7 @@ const MempoolOverview = () => {
           <Card title="Transactions in Mempool" className="data-card">
             <Statistic value={summaryStats.totalTransactions.toLocaleString()} />
           </Card>
-        </Col>
-        {/*
-        <Col xs={24} lg={8} style={{ display: 'flex' }}>
-        <Card title="Recommended Fees (sat/vB)" className="data-card">
-          <Statistic
-            value={feeEstimation ? `${feeEstimation.fast_fee.toFixed(0)}` : '--'}
-            suffix={feeEstimation ? ` (Fast) / ${feeEstimation.medium_fee.toFixed(0)} (Med) / ${feeEstimation.low_fee.toFixed(0)} (Low)`  : ''}
-          />
-        </Card>
-        </Col>
-        */}
+        </Col>        
       </Row>
 
       <Row gutter={[24, 24]}>

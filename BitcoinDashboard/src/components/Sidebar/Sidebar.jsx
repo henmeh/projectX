@@ -36,14 +36,9 @@ const Sidebar = () => {
       //label: 'Mempool Insights' 
     },
     { 
-      key: 'fee-predictions', 
+      key: 'fee-statistics', 
       icon: <RocketOutlined />, 
       //label: 'Fee Statistics' 
-    },
-    { 
-      key: 'fee-pressure', 
-      icon: <HeatMapOutlined />, 
-      //label: 'Fee Pressure Map' 
     },
   ];
   

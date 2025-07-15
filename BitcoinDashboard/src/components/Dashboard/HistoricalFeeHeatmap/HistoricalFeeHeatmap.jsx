@@ -1,22 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Radio } from 'antd';
 import { ClockCircleOutlined, PieChartOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/api';
 import { Heatmap } from '@ant-design/plots'; // Ensure Heatmap is imported
-import "./Dashboard.css";
-import "./FeePressureMap.css";
-
-// Assuming these API functions are defined in services/api.js
-// And fetchFeePattern() specifically takes no parameters for days.
-import { fetchMempoolCongestion, fetchFeeHistogram, fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../services/api';
+import "../Dashboard.css";
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
 
-/**
- * Helper function to map various incoming fee_category strings
- * to a standardized lowercase key used internally.
- * This handles potential casing inconsistencies from the backend.
- */
 const mapCategoryKey = (categoryString) => {
   if (!categoryString) return 'unknown';
   const lowerCaseCategory = categoryString.toLowerCase();
@@ -26,132 +17,6 @@ const mapCategoryKey = (categoryString) => {
   return 'unknown';
 };
 
-/**
- * CurrentMempoolVisualizer Component
- * Displays real-time mempool congestion status and a visual representation of blocks in the mempool.
- * This component remains unchanged from previous iterations as it was not part of the current issues.
- */
-const CurrentMempoolVisualizer = () => {
-  const [congestionStatus, setCongestionStatus] = useState(null);
-  const [mempoolBlocks, setMempoolBlocks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const BLOCK_VSIZE_LIMIT = 1000000; // 1 MB in vBytes
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [congestionData, histogramData] = await Promise.all([
-          fetchMempoolCongestion(),
-          fetchFeeHistogram()
-        ]);
-        setCongestionStatus(congestionData);
-
-        if (!histogramData?.histogram || !Array.isArray(histogramData.histogram)) {
-          console.warn("Fee histogram data is missing or malformed, setting empty array.");
-          setMempoolBlocks([]);
-          return;
-        }
-
-        const sortedFeeLevels = histogramData.histogram
-          .map(([fee, v_size]) => ({ fee: parseFloat(fee), v_size: parseInt(v_size) }))
-          .sort((a, b) => b.fee - a.fee);
-
-        const blocks = [];
-        let currentBlock = { v_size: 0, fees: [] };
-
-        for (const level of sortedFeeLevels) {
-          if (currentBlock.v_size + level.v_size > BLOCK_VSIZE_LIMIT && currentBlock.v_size > 0) {
-            blocks.push(currentBlock);
-            currentBlock = { v_size: 0, fees: [] };
-          }
-          currentBlock.v_size += level.v_size;
-          currentBlock.fees.push(level.fee);
-        }
-        if (currentBlock.v_size > 0) {
-          blocks.push(currentBlock);
-        }
-        setMempoolBlocks(blocks);
-
-      } catch (err) {
-        console.error("Error loading current mempool data:", err);
-        setError("Could not load current mempool data. Please try again later.");
-        setCongestionStatus(null);
-        setMempoolBlocks([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getStatusColor = (status) => {
-    if (!status) return 'default';
-    const lowerStatus = status.toLowerCase();
-    if (lowerStatus === 'high') return 'error';
-    if (lowerStatus === 'medium') return 'warning';
-    return 'success';
-  };
-
-  const getBlockFeeRange = (fees) => {
-    if (!fees || fees.length === 0) return 'N/A';
-    const min = Math.min(...fees);
-    const max = Math.max(...fees);
-    return min === max ? `${min.toFixed(0)} sat/vB` : `${min.toFixed(0)} - ${max.toFixed(0)} sat/vB`;
-  };
-
-  return (
-    <Skeleton loading={loading} active paragraph={{ rows: 8 }}>
-      {error && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
-      {congestionStatus && (
-        <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
-          <Col xs={24} lg={12}>
-            <Card title="Mempool Status" className="data-card">
-              <Statistic value=" " prefix={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
-            </Card>
-          </Col>
-          <Col xs={24} lg={12}>
-            <Card title="Total vSize" className="data-card">
-              <Statistic value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
-            </Card>
-          </Col>
-        </Row>
-      )}
-      <Card
-        title={<Title level={4} style={{ margin: 0 }}>Mempool Blocks</Title>}
-        className="dashboard-card"
-      >
-        <Text type="secondary">A real-time view of data waiting in the mempool, organized into 1MB blocks.</Text>
-        <div className="mempool-blocks-container">
-          {mempoolBlocks.map((block, index) => {
-            const percentage = Math.min((block.v_size / BLOCK_VSIZE_LIMIT) * 100, 100);
-            return (
-              <div key={index} className="mempool-block">
-               <div className="block-header">
-                  <Text strong>{index === 0 ? 'Next Block' : `Block #${index + 1}`}</Text>
-                  <Text type="secondary">{getBlockFeeRange(block.fees)}</Text>
-                </div>
-                <Progress percent={percentage} strokeColor={percentage > 95 ? '#ff4d4f' : percentage > 70 ? '#faad14' : '#52c41a'} format={() => `${(block.v_size / 1000000).toFixed(2)} MB`} />
-              </div>
-            );
-          })}
-          {!mempoolBlocks.length && !loading && !error && <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginTop: 32 }}>Mempool is currently empty.</Text>}
-        </div>
-      </Card>
-    </Skeleton>
-  );
-};
-
-
-/**
- * HistoricalFeeHeatmap Component
- * Displays historical network fee data using a heatmap and a text summary of fee patterns.
- */
 const HistoricalFeeHeatmap = () => {
   const [heatmapData, setHeatmapData] = useState([]);
   const [categorizedFeePatterns, setCategorizedFeePatterns] = useState(null); 
@@ -442,30 +307,4 @@ const HistoricalFeeHeatmap = () => {
   );
 };
 
-/**
- * CombinedFeeView Component
- * Acts as the main container, using Ant Design Tabs to switch between
- * Current Mempool Visualizer and Historical Fee Heatmap.
- */
-const CombinedFeeView = () => {
-  const items = [
-    {
-      key: '1',
-      label: <><PieChartOutlined /> Current Mempool</>,
-      children: <CurrentMempoolVisualizer />,
-    },
-    {
-      key: '2',
-      label: <><ClockCircleOutlined /> Historical Patterns</>,
-      children: <HistoricalFeeHeatmap />,
-    },
-  ];
-
-  return (
-    <Card className="dashboard-card">
-      <Tabs defaultActiveKey="1" items={items} />
-    </Card>
-  );
-};
-
-export default CombinedFeeView;
+export default HistoricalFeeHeatmap;
