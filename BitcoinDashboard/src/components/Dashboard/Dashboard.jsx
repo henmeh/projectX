@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layout } from 'antd';
-import WhaleTransactions from './WhaleTransactions';
+import WhaleTransactions from './WhaleTransactions/WhaleTransactions';
 import { useAppContext } from '../../context/AppContext';
 import './Dashboard.css';
 import MempoolInsights from './MempoolInsights/MempoolInsights';
