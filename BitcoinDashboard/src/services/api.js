@@ -64,3 +64,33 @@ export const fetchMempoolCongestion = async () => {
     return null;
   }
 };
+
+export const fetchHistoricalFeeHeatmap = async (days = 7) => {
+  try {
+    const response = await api.get(`/historical-fee-heatmap/${days}`);
+    return response.data
+  } catch (error) {
+    console.error('Error fetching historical fee heatmap data:', error);
+    return null;
+  }
+};
+
+export const fetchMempoolInsights = async () => {
+  try {
+    const response = await api.get('/mempool-insights'); // Matches Flask endpoint
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching mempool insights:', error);
+    return [];
+  }
+};
+
+export const fetchFeePattern = async () => {
+  try {
+    const response = await api.get('/fee-pattern'); // Matches Flask endpoint
+    return response.data || [];
+  } catch (error) {
+    console.error('Error fetching fee pattern:', error);
+    return [];
+  }
+};

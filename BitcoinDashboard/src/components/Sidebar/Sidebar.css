@@ -3,6 +3,8 @@
   height: 100vh;
   position: auto;
   left: 0;
+  display: flex;
+  background: var(--dark-sider-bg);
 }
 
 .mobile-sidebar-header {
@@ -18,6 +20,7 @@
 /* Add backdrop for mobile sidebar */
 @media (max-width: 767px) {
   .sidebar-backdrop {
+    display: block;
     position: fixed;
     top: 0;
     left: 0;
@@ -26,4 +29,26 @@
     background: rgba(0, 0, 0, 0.5);
     z-index: 999;
   }
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: none; /* Hidden by default */
+}
+
+
+.logo {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--primary-color);
 }

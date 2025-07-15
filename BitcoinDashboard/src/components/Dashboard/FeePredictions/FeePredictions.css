@@ -1,0 +1,23 @@
+.custom-tooltip {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 10px;
+  border-radius: 4px;
+  color: #fff;
+}
+
+.custom-tooltip .label {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.fee-card.low-fee {
+  border-top: 4px solid var(--success-color);
+}
+
+.fee-card.medium-fee {
+  border-top: 4px solid var(--primary-color);
+}
+
+.fee-card.high-fee {
+  border-top: 4px solid var(--error-color);
+}

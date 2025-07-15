@@ -170,8 +170,19 @@ class WhaleTracking:
     def get_mempool_txids(self) -> list:
         """Get transaction IDs from mempool"""
         try:
+            #Fetch all txids that are in my node mempool
             response = self.node.rpc_call("getrawmempool", [])
-            return response.get("result", []) if "result" in response else []
+            node_mempool_txids = response.get("result", []) if "result" in response else []
+
+            #Fetch all txids that are in my mempool db
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    # Fetch all TXIDs from database
+                    cursor.execute("SELECT txid FROM whale_transactions")
+                    db_mempool_txids = [row[0] for row in cursor.fetchall()]
+            new_mempool_txids = [txid for txid in node_mempool_txids if txid not in db_mempool_txids]
+            return new_mempool_txids
+        
         except Exception:
             return []
 

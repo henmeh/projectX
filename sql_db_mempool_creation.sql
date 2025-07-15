@@ -11,6 +11,9 @@ DROP TABLE IF EXISTS public.transactions_inputs CASCADE;
 DROP TABLE IF EXISTS public.transactions_outputs CASCADE;
 DROP TABLE IF EXISTS public.whale_balance_history CASCADE;
 DROP TABLE IF EXISTS public.whale_behavior CASCADE;
+DROP TABLE IF EXISTS public.fee_pattern CASCADE;
+
+DROP TABLE IF EXISTS mempool_value_insights CASCADE;
 
 -- Create essential tables
 CREATE TABLE mempool_fee_histogram (
@@ -21,6 +24,18 @@ CREATE TABLE mempool_fee_histogram (
     medium_fee REAL,
     low_fee REAL
 ) TABLESPACE mempool;
+
+
+CREATE TABLE IF NOT EXISTS fee_pattern (
+    id SERIAL PRIMARY KEY,
+    analysis_timestamp TIMESTAMPTZ NOT NULL,
+    fee_category VARCHAR(50) NOT NULL,
+    day_of_week_num INT NOT NULL,
+    start_hour INT NOT NULL,
+    end_hour INT NOT NULL,
+    avg_fee_for_category NUMERIC(10, 2)
+) TABLESPACE mempool;
+
 
 -- Fee Prediction Table
 CREATE TABLE fee_predictions (
@@ -57,6 +72,16 @@ CREATE TABLE whale_transactions (
 	fee_per_vbyte REAL,
 	total_sent REAL,
 	btcusd REAL) TABLESPACE mempool;
+
+CREATE TABLE mempool_value_insights (
+    id BIGSERIAL PRIMARY KEY,
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    amount_range VARCHAR(50) NOT NULL, -- e.g., '0-1 BTC', '1-10 BTC'
+    total_vsize_bytes BIGINT NOT NULL,
+    avg_fee_per_vbyte REAL NOT NULL,
+    transaction_count INTEGER NOT NULL,
+    UNIQUE (generated_at, amount_range) -- Ensures one entry per range per generation batch
+) TABLESPACE mempool;
             
 CREATE TABLE transactions_inputs (
 	txid TEXT,

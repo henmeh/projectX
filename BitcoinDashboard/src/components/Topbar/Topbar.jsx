@@ -55,7 +55,7 @@ const Topbar = () => {
 
   return (
     <Header className={`topbar ${darkMode ? 'dark' : 'light'}`}>
-      <div className="topbar-left">
+      <div>
         {showToggleButton && (
           <Button
             type="text"
@@ -64,17 +64,17 @@ const Topbar = () => {
             className="menu-toggle"
           />
         )}
-        <div className="app-name">Bitcoin Analytics Dashboard</div>
+        <div>Bitcoin Analytics Dashboard</div>
       </div>
       
-      <div className="topbar-right">
+      <div>
         <Dropdown 
           menu={{ items: menuItems }}
           open={userMenuOpen}
           onOpenChange={setUserMenuOpen}
           trigger={['click']}
         >
-          <Button type="text" className="user-menu">
+          <Button type="text">
             <Avatar icon={<UserOutlined />} />
           </Button>
         </Dropdown>

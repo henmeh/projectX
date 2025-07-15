@@ -198,7 +198,7 @@ def get_fee_prediction(table_name: str = Path(..., description="The name of the 
             {table_name}
         WHERE
             generated_at = (SELECT MAX(generated_at) FROM {table_name})
-            AND prediction_time >= NOW() AT TIME ZONE 'UTC' -- Use NOW() AT TIME ZONE 'UTC' for robust timezone handling
+            --AND prediction_time >= NOW() AT TIME ZONE 'UTC' -- Use NOW() AT TIME ZONE 'UTC' for robust timezone handling
         ORDER BY
             prediction_time ASC, model_name ASC; -- Order for consistent display
     """
@@ -301,6 +301,111 @@ def get_historical_histogram(hours: int = 24):
         ORDER BY timestamp DESC
     """
     return {"historical_histograms": fetch_data(query, (f"{hours} hours",))}
+
+
+@app.get("/historical-fee-heatmap/{days}")
+def get_historical_fee_heatmap(days: int = 7):
+    """
+    Fetches historical average fee data grouped by day of week and hour of day
+    for a heatmap visualization.
+    """
+    if days <= 0:
+        raise HTTPException(status_code=400, detail="Days must be positive")
+    if days > 90:  # Limit to a reasonable historical range, e.g., 90 days
+        days = 90
+        
+    query = """
+        SELECT
+            EXTRACT(DOW FROM timestamp) AS day_of_week_num, -- 0=Sunday, 1=Monday, ..., 6=Saturday
+            EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC') AS hour_of_day,
+            CAST(AVG(fast_fee) AS NUMERIC(10,1)) AS avg_fee
+        FROM
+            mempool_fee_histogram
+        WHERE
+            timestamp >= NOW() - INTERVAL %s
+        GROUP BY
+            EXTRACT(DOW FROM timestamp),
+            EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC')
+        ORDER BY
+            day_of_week_num,
+            hour_of_day;
+    """
+    # PostgreSQL EXTRACT(DOW) returns 0 for Sunday, 1 for Monday, etc.
+    # The frontend expects a specific mapping.
+    day_mapping = {
+        0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat'
+    }
+
+    raw_data = fetch_data(query, (f"{days} days",))
+    
+    # Map numerical day of week to string day of week
+    heatmap_data = []
+    for row in raw_data:
+        day_num = int(row['day_of_week_num'])
+        hour = int(row['hour_of_day'])
+        avg_fee = float(row['avg_fee'])
+        heatmap_data.append({
+            "day": day_mapping.get(day_num, 'Unknown'),
+            "hour": hour,
+            "avg_fee": avg_fee
+        })
+    
+    if not heatmap_data:
+        raise HTTPException(status_code=404, detail="No historical fee data available for the specified range.")
+        
+    return heatmap_data
+
+
+# --- Endpoint to fetch latest mempool insights for the frontend ---
+@app.get('/mempool-insights')
+def get_mempool_insights():
+    """
+    Fetches the latest aggregated mempool insights (vsize and fee distribution by value sent).
+    """
+    query = """
+            SELECT
+                amount_range,
+                total_vsize_bytes,
+                avg_fee_per_vbyte,
+                transaction_count,
+                generated_at
+            FROM mempool_value_insights
+            WHERE
+                generated_at = (SELECT MAX(generated_at) FROM mempool_value_insights)
+            ORDER BY
+                CASE amount_range
+                    WHEN '0-1 BTC' THEN 1
+                    WHEN '1-10 BTC' THEN 2
+                    WHEN '10-50 BTC' THEN 3
+                    WHEN '50-100 BTC' THEN 4
+                    WHEN '>100 BTC' THEN 5
+                    ELSE 6
+                END ASC;
+                """
+    result = fetch_data(query)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="No mempool-insights data available")
+
+
+@app.get('/fee-pattern')
+def get_fee_pattern():
+    """
+    Fetches the latest fee pattern from fee pattern table
+    """
+    query = """
+            SELECT 
+                *
+            FROM
+                fee_pattern
+            WHERE
+                analysis_timestamp = (SELECT MAX(analysis_timestamp) FROM fee_pattern);
+                """
+    result = fetch_data(query)
+    if result:
+        return result
+    raise HTTPException(status_code=404, detail="No fee pattern data available")
+
 
 
 if __name__ == "__main__":
