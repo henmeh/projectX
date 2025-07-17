@@ -226,12 +226,11 @@ const HistoricalFeeHeatmap = () => {
         <>
           {heatmapStats && (
             <Row gutter={16} style={{ marginBottom: 24 }}>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Lowest Fee" value={heatmapStats.minFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#52c41a' }} /></Card></Col>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Average Fee" value={heatmapStats.avgFee.toFixed(1)} suffix="sat/vB" /></Card></Col>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Peak Fee" value={heatmapStats.maxFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
-            </Row>
+              <Col xs={24} sm={8}><DataCard title="Lowest Fee" data={`${heatmapStats.minFee.toFixed(1)} sat/vB`}/></Col>
+              <Col xs={24} sm={8}><DataCard title="Average Fee" data={`${heatmapStats.avgFee.toFixed(1)} sat/vB`}/></Col>
+              <Col xs={24} sm={8}><DataCard title="Highest Fee" data={`${heatmapStats.maxFee.toFixed(1)} sat/vB`}/></Col>
+              </Row>
           )}
-
           <Card 
             className="data-card"
             title={<Title level={4} style={{ margin: 0 }}> Fee Hotspots </Title>}
@@ -249,7 +248,7 @@ const HistoricalFeeHeatmap = () => {
 
           <Card 
             className="dashboard-card"
-            title={<Title level={4} style={{ margin: 0 }}> Weekly Fee Summary </Title>}
+            title={<Title level={4}> Weekly Fee Summary </Title>}
             style={{ marginTop: 24 }}
           >            
             <Row gutter={16} style={{ marginBottom: 24 }}>
@@ -267,17 +266,7 @@ const HistoricalFeeHeatmap = () => {
                                                 <Text>{timeEntry}</Text>
                                             </li>
                                         ))}
-                                    </ul>} />
-                                {/*
-                                <Card className={`fee-card ${category}-fee`} key={category} style={{ marginBottom: 20, height: "100%" }}
->                                 
-                                    <Statistic title={<Title level={5} style={{ textTransform: 'capitalize'}}>
-                                        {category} Fee Times:
-                                    </Title>} value="2" suffix="sat/vB" precision={1} />                             
-                                    <Text strong>Average Fee: {data.avgFee} sat/vB</Text>
-                                    
-                                </Card>
-                                */}
+                                    </ul>}/>
                                 </Col>
                             );
                         }
