@@ -183,13 +183,13 @@ const FeePredictions = () => {
           </Title>
           <Row gutter={16} style={{ marginBottom: 24 }}>
             <Col span={8}>
-              <DataCard className="fee-card low-fee" title="Predicted Low Fee" data={`${immediateNextPrediction.predictedLow} sat/vB`} />
+              <DataCard className="fee-card low-fee" title="Predicted Low Fee" data={`${immediateNextPrediction.predictedLow.toFixed(2)} sat/vB`} />
             </Col> 
             <Col span={8}>
-              <DataCard className="fee-card medium-fee" title="Predicted Medium Fee" data={`${immediateNextPrediction.predictedMedium} sat/vB`} />
+              <DataCard className="fee-card medium-fee" title="Predicted Medium Fee" data={`${immediateNextPrediction.predictedMedium.toFixed(2)} sat/vB`} />
             </Col>
             <Col span={8}>
-              <DataCard className="fee-card high-fee" title="High Fee" data={`${immediateNextPrediction.predictedHigh} sat/vB`} />
+              <DataCard className="fee-card high-fee" title="High Fee" data={`${immediateNextPrediction.predictedHigh.toFixed(2)} sat/vB`} />
             </Col>
           </Row>
         </>
