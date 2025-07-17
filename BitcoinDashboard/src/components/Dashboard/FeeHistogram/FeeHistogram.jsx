@@ -3,6 +3,8 @@ import { Card, Typography, Row, Col, Statistic, Alert, Skeleton } from 'antd';
 import { BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { AreaChartOutlined, BarChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import "../Dashboard.css"
+import DataCard from '../../DataCard/DataCard.jsx';
+
 
 // Importing from your services/api.js file
 import { fetchFeeEstimation, fetchFeeHistogram, fetchMempoolInsights } from '../../../services/api';
@@ -134,14 +136,10 @@ const FeeHistogram = () => {
 
       <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
         <Col xs={24} lg={12}>
-          <Card title="Total Mempool Size" className="data-card">
-            <Statistic value={(summaryStats.totalVsize / 1000000).toFixed(2)} suffix="MB" />
-          </Card>
+          <DataCard className="data-card" title="Total Mempool Size" data={`${(summaryStats.totalVsize / 1000000).toFixed(2)} MB`} />
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="Transactions in Mempool" className="data-card">
-            <Statistic value={summaryStats.totalTransactions.toLocaleString()} />
-          </Card>
+          <DataCard className="data-card" title="Transactions in Mempool" data={summaryStats.totalTransactions.toLocaleString()} />
         </Col>        
       </Row>
 

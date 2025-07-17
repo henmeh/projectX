@@ -3,6 +3,7 @@ import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, 
 import { fetchMempoolCongestion, fetchFeeHistogram } from '../../../services/api';
 import "./CurrentMempoolVisualizer.css"
 import "../Dashboard.css";
+import DataCard from '../../DataCard/DataCard.jsx';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -87,14 +88,10 @@ const CurrentMempoolVisualizer = () => {
       {congestionStatus && (
         <Row gutter={[24, 24]} style={{ marginTop: 24, marginBottom: 24 }} align="stretch">
           <Col xs={24} lg={12}>
-            <Card title="Mempool Status" className="data-card">
-              <Statistic value=" " prefix={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
-            </Card>
+            <DataCard className="data-card" title="Mempool Status" data={<Tag color={getStatusColor(congestionStatus.congestion_status)}>{congestionStatus.congestion_status || 'Unknown'}</Tag>} />
           </Col>
           <Col xs={24} lg={12}>
-            <Card title="Total vSize" className="data-card">
-              <Statistic value={(congestionStatus.total_vsize / 1000000).toFixed(2)} suffix="MB" />
-            </Card>
+            <DataCard className="data-card" title="Total vSize" data={`${(congestionStatus.total_vsize / 1000000).toFixed(2)} MB`} />
           </Col>
         </Row>
       )}

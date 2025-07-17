@@ -5,6 +5,8 @@ import { fetchFeeEstimation, fetchFeePrediction } from '../../../services/api';
 import moment from 'moment'; // Make sure to install moment: npm install moment or yarn add moment
 import '../Dashboard.css'
 import './FeePredictions.css'
+import DataCard from '../../DataCard/DataCard.jsx';
+
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -136,26 +138,20 @@ const FeePredictions = () => {
           <Title level={5} style={{ marginBottom: 16 }}>Current Market Fees</Title>
           <Row gutter={16} style={{ marginBottom: 24 }}>
             <Col span={8}>
-              <Card className="fee-card low-fee">
-                <Statistic title="Current Low Fee" value={currentFees.low_fee} suffix="sat/vB" precision={1} />
-              </Card>
+              <DataCard className="fee-card low-fee" title="Current Low Fee" data={`${currentFees.low_fee} sat/vB`} />
             </Col>
             <Col span={8}>
-              <Card className="fee-card medium-fee">
-                <Statistic title="Current Medium Fee" value={currentFees.medium_fee} suffix="sat/vB" precision={1} />
-              </Card>
+              <DataCard className="fee-card medium-fee" title="Current Medium Fee" data={`${currentFees.medium_fee} sat/vB`} />
             </Col>
             <Col span={8}>
-              <Card className="fee-card high-fee">
-                <Statistic title="Current High Fee" value={currentFees.fast_fee} suffix="sat/vB" precision={1} />
-              </Card>
+              <DataCard className="fee-card high-fee" title="Current High Fee" data={`${currentFees.fast_fee} sat/vB`} />
             </Col>
           </Row>
         </>
       )}
 
       {/* Prediction Setup Section */}
-      <Space style={{ marginBottom: 24 }}> {/* Added marginBottom here for spacing */}
+      <Space style={{ marginBottom: 24, marginTop: 24 }}> {/* Added marginBottom here for spacing */}
           {/* Radio Group for Model Selection (Prophet vs. Random Forest) */}
           <Radio.Group
             options={modelOptions}
@@ -187,39 +183,19 @@ const FeePredictions = () => {
           </Title>
           <Row gutter={16} style={{ marginBottom: 24 }}>
             <Col span={8}>
-              <Card className="fee-card low-fee" size="small">
-                <Statistic
-                  title="Low Fee"
-                  value={immediateNextPrediction.predictedLow}
-                  suffix="sat/vB"
-                  precision={1}
-                />
-              </Card>
+              <DataCard className="fee-card low-fee" title="Predicted Low Fee" data={`${immediateNextPrediction.predictedLow.toFixed(2)} sat/vB`} />
+            </Col> 
+            <Col span={8}>
+              <DataCard className="fee-card medium-fee" title="Predicted Medium Fee" data={`${immediateNextPrediction.predictedMedium.toFixed(2)} sat/vB`} />
             </Col>
             <Col span={8}>
-              <Card className="fee-card medium-fee" size="small">
-                <Statistic
-                  title="Medium Fee"
-                  value={immediateNextPrediction.predictedMedium}
-                  suffix="sat/vB"
-                  precision={1}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="fee-card high-fee" size="small">
-                <Statistic
-                  title="High Fee"
-                  value={immediateNextPrediction.predictedHigh}
-                  suffix="sat/vB"
-                  precision={1}
-                />
-              </Card>
+              <DataCard className="fee-card high-fee" title="High Fee" data={`${immediateNextPrediction.predictedHigh.toFixed(2)} sat/vB`} />
             </Col>
           </Row>
         </>
       )}
 
+      <Card className='data-card'>
       {/* Display the timestamp when this forecast batch was generated */}
       {latestGeneratedAt && (
         <Typography.Text strong style={{ marginBottom: 16, display: 'block' }}>
@@ -269,6 +245,7 @@ const FeePredictions = () => {
       ) : (
         <Text disabled>No future predictions available for the selected model and interval.</Text>
       )}
+      </Card>
     </Card>
   );
 };

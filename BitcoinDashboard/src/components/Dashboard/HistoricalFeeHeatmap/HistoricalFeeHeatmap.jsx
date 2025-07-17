@@ -4,6 +4,8 @@ import { ClockCircleOutlined, PieChartOutlined, InfoCircleOutlined } from '@ant-
 import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/api';
 import { Heatmap } from '@ant-design/plots'; // Ensure Heatmap is imported
 import "../Dashboard.css";
+import "../FeePredictions/FeePredictions.css";
+import DataCard from '../../DataCard/DataCard.jsx';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -198,15 +200,6 @@ const HistoricalFeeHeatmap = () => {
    * @param {string} category - The fee category ('low', 'medium', 'high').
    * @returns {string} CSS color string.
    */
-  const getCategoryTextColor = (category) => {
-    switch(category.toLowerCase()) {
-      case 'low': return '#52c41a'; // Green
-      case 'medium': return '#faad14'; // Orange
-      case 'high': return '#ff4d4f'; // Red
-      default: return '#e6e6e6'; // Default color for unknown categories
-    }
-  };
-
 
   return (
     <Card
@@ -232,12 +225,11 @@ const HistoricalFeeHeatmap = () => {
         <>
           {heatmapStats && (
             <Row gutter={16} style={{ marginBottom: 24 }}>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Lowest Fee" value={heatmapStats.minFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#52c41a' }} /></Card></Col>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Average Fee" value={heatmapStats.avgFee.toFixed(1)} suffix="sat/vB" /></Card></Col>
-              <Col xs={24} sm={8}><Card size="small"><Statistic title="Peak Fee" value={heatmapStats.maxFee.toFixed(1)} suffix="sat/vB" valueStyle={{ color: '#ff4d4f' }} /></Card></Col>
-            </Row>
+              <Col xs={24} sm={8}><DataCard title="Lowest Fee" data={`${heatmapStats.minFee.toFixed(1)} sat/vB`}/></Col>
+              <Col xs={24} sm={8}><DataCard title="Average Fee" data={`${heatmapStats.avgFee.toFixed(1)} sat/vB`}/></Col>
+              <Col xs={24} sm={8}><DataCard title="Highest Fee" data={`${heatmapStats.maxFee.toFixed(1)} sat/vB`}/></Col>
+              </Row>
           )}
-
           <Card 
             className="data-card"
             title={<Title level={4} style={{ margin: 0 }}> Fee Hotspots </Title>}
@@ -255,30 +247,25 @@ const HistoricalFeeHeatmap = () => {
 
           <Card 
             className="dashboard-card"
-            title={<Title level={4} style={{ margin: 0 }}> Weekly Fee Summary </Title>}
+            title={<Title level={4}> Weekly Fee Summary </Title>}
             style={{ marginTop: 24 }}
           >            
             <Row gutter={16} style={{ marginBottom: 24 }}>
               {categorizedFeePatterns && Object.keys(categorizedFeePatterns).length > 0 ? (
                 <>
-                    {['high', 'medium', 'low'].map(category => {
+                    {['low', 'medium', 'high'].map(category => {
                         const data = categorizedFeePatterns[category];
                         if (data && data.times.length > 0) { // Ensure there are times to display for the category
                             return (
                                 <Col xs={24} sm={8}>
-                                <Card className="data-card" key={category} style={{ marginBottom: 20 }}
-                                title={<Title level={5} style={{ color: getCategoryTextColor(category), textTransform: 'capitalize', margin: '10px 0 5px 0' }}>
-                                        {category} Fee Times:
-                                    </Title>}>                                    
-                                    <Text strong>Average Fee: {data.avgFee} sat/vB</Text>
-                                    <ul style={{ listStyleType: 'disc', paddingLeft: 20, marginTop: 5 }}>
+                                  <DataCard className={`fee-card ${category}-fee`} key={category} title={`${category.toUpperCase()} Fee Times`} data={<ul style={{ listStyleType: 'disc', paddingLeft: 20, marginTop: 5 }}>
+                                        <Text strong>Average Fee: {data.avgFee} sat/vB</Text>
                                         {data.times.map((timeEntry, index) => (
-                                            <li key={index} style={{ marginBottom: 4 }}>
+                                            <li key={index} style={{ marginBottom: 4, marginTop: 4 }}>
                                                 <Text>{timeEntry}</Text>
                                             </li>
                                         ))}
-                                    </ul>
-                                </Card>
+                                    </ul>}/>
                                 </Col>
                             );
                         }
