@@ -5,7 +5,6 @@ import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/ap
 import { Heatmap } from '@ant-design/plots'; // Ensure Heatmap is imported
 import "../Dashboard.css";
 import "../FeePredictions/FeePredictions.css";
-import "../../DataCard/DataCard.jsx";
 import DataCard from '../../DataCard/DataCard.jsx';
 
 const { Title, Text } = Typography;
