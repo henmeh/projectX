@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Typography, Row, Col, Statistic, Tag, Progress, Skeleton, Alert, Tabs, Radio } from 'antd';
 import { ClockCircleOutlined, PieChartOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/api';
+import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/api.js';
 import { Heatmap } from '@ant-design/plots'; // Ensure Heatmap is imported
 import "../Dashboard.css";
 import "../FeePredictions/FeePredictions.css";
@@ -19,7 +19,7 @@ const mapCategoryKey = (categoryString) => {
   return 'unknown';
 };
 
-const HistoricalFeeHeatmap = () => {
+const HistoricalFeeHeatmapAntDesign = () => {
   const [heatmapData, setHeatmapData] = useState([]);
   const [categorizedFeePatterns, setCategorizedFeePatterns] = useState(null); 
   const [loading, setLoading] = useState(true);
@@ -294,4 +294,4 @@ const HistoricalFeeHeatmap = () => {
   );
 };
 
-export default HistoricalFeeHeatmap;
+export default HistoricalFeeHeatmapAntDesign;

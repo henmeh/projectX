@@ -1,7 +1,9 @@
 import { Card, Tabs } from 'antd';
 import { PieChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import FeePredictions from "../FeePredictions/FeePredictions";
-import HistoricalFeeHeatmap from "../HistoricalFeeHeatmap/HistoricalFeeHeatmap";
+import HistoricalFeeHeatmapAntDesign from '../HistoricalFeeHeatmap/HistoricalFeeHeatmapAntDesign';
+import FeeHeatmap from '../HistoricalFeeHeatmap/HistoricalFeeHeatmapGrok';
+
 
 const FeeStatistics = () => {
   const items = [
@@ -13,7 +15,7 @@ const FeeStatistics = () => {
     {
       key: '2',
       label: <><ClockCircleOutlined /> Historical Patterns</>,
-      children: <HistoricalFeeHeatmap />,
+      children: <FeeHeatmap />,
     },
   ];
 
