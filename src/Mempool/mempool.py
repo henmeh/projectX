@@ -1,8 +1,9 @@
+from typing import Dict
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 import psycopg2
 
 class Mempool:
@@ -50,24 +51,27 @@ class Mempool:
                 conn.rollback()
         return conn
 
-        
-    def get_mempool_feerates(self, block_vsize_limit: int = 1_000_000) -> dict:
+
+    def get_mempool_feerates(self, block_vsize_limit: int = 1_000_000) -> Dict[str, any]:
+        """
+        Fetches mempool fee rates from node, calculates percentiles, caches, and stores in DB.
+        Falls back to DB or defaults on error.
+        """
         current_time = time.time()
         
         # Return cached data if valid
         if self.fee_cache and (current_time - self.last_fetch_time) < self.cache_duration:
             return self.fee_cache
         
-        conn = None
         try:
-            conn = self.connect_db()
-            cursor = conn.cursor()
-
             # Get fee histogram from node
-            fee_histogram = self.node.electrum_request("mempool.get_fee_histogram")["result"]
+            fee_histogram_response = self.node.electrum_request("mempool.get_fee_histogram")["result"]
             
-            if not fee_histogram:
+            if not fee_histogram_response:
                 raise ValueError("Empty fee histogram response")
+            
+            # Ensure sorted descending by fee_rate (node usually does, but guarantee)
+            fee_histogram = sorted(fee_histogram_response, key=lambda x: x[0], reverse=True)
             
             total_vsize = 0
             percentiles = {
@@ -85,7 +89,7 @@ class Mempool:
                 if total_vsize >= block_vsize_limit:
                     break
             
-            # Prepare result
+            # Prepare result (use 1 as min if None)
             result = {
                 "fast": percentiles[25]["fee"] or 1,
                 "medium": percentiles[50]["fee"] or 1,
@@ -97,38 +101,40 @@ class Mempool:
             self.fee_cache = result
             self.last_fetch_time = current_time
             
-            # Insert into database
-            cursor.execute(
-                "INSERT INTO mempool_fee_histogram (timestamp, histogram, fast_fee, medium_fee, low_fee) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (datetime.now(), json.dumps(fee_histogram), result["fast"], result["medium"], result["low"])
-            )
-            conn.commit()
+            # Insert into database with UTC timestamp
+            with self.connect_db() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO mempool_fee_histogram (timestamp, histogram, fast_fee, medium_fee, low_fee) "
+                        "VALUES (%s, %s, %s, %s, %s)",
+                        (datetime.now(timezone.utc), json.dumps(fee_histogram), result["fast"], result["medium"], result["low"])
+                    )
+                    conn.commit()
             
             return result
             
         except Exception as e:
-            print(e)
+            print(f"Error fetching fees: {e}")
             # FALLBACK: Use last known data from database
-            if conn:
-                cursor = conn.cursor()
-                try:
-                    cursor.execute(
-                        "SELECT histogram, fast_fee, medium_fee, low_fee "
-                        "FROM mempool_fee_histogram "
-                        "ORDER BY timestamp DESC LIMIT 1"
-                    )
-                    last_data = cursor.fetchone()
-                    
-                    if last_data:
-                        return {
-                            "fast": last_data[1],
-                            "medium": last_data[2],
-                            "low": last_data[3],
-                            "histogram": json.loads(last_data[0])
-                        }
-                except Exception as inner_e:
-                    print(f"Fallback query failed: {inner_e}")
+            try:
+                with self.connect_db() as conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute(
+                            "SELECT histogram, fast_fee, medium_fee, low_fee "
+                            "FROM mempool_fee_histogram "
+                            "ORDER BY timestamp DESC LIMIT 1"
+                        )
+                        last_data = cursor.fetchone()
+                        
+                        if last_data:
+                            return {
+                                "fast": last_data[1],
+                                "medium": last_data[2],
+                                "low": last_data[3],
+                                "histogram": json.loads(last_data[0])
+                            }
+            except Exception as inner_e:
+                print(f"Fallback query failed: {inner_e}")
             
             # Ultimate fallback if everything fails
             return {
@@ -137,8 +143,3 @@ class Mempool:
                 "low": 1,
                 "histogram": []
             }
-            
-        finally:
-            # Ensure connection is always closed
-            if conn:
-                conn.close()

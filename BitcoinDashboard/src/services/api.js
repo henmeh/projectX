@@ -65,9 +65,9 @@ export const fetchMempoolCongestion = async () => {
   }
 };
 
-export const fetchHistoricalFeeHeatmap = async (days = 7) => {
+export const fetchHistoricalFeeHeatmap = async (days = 7, fee_type = 'fast') => {
   try {
-    const response = await api.get(`/historical-fee-heatmap/${days}`);
+    const response = await api.get(`/historical-fee-heatmap/${days}_${fee_type}`);
     return response.data
   } catch (error) {
     console.error('Error fetching historical fee heatmap data:', error);

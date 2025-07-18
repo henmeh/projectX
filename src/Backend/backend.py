@@ -8,6 +8,8 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 import uvicorn
+from typing import List, Dict, Any
+
 
 # Initialize FastAPI app
 app = FastAPI(title="Bitcoin Analytics API", version="1.0.0")
@@ -303,22 +305,29 @@ def get_historical_histogram(hours: int = 24):
     return {"historical_histograms": fetch_data(query, (f"{hours} hours",))}
 
 
-@app.get("/historical-fee-heatmap/{days}")
-def get_historical_fee_heatmap(days: int = 7):
+@app.get("/historical-fee-heatmap/{days}_{fee_type}")
+def get_historical_fee_heatmap(days: int = 7, fee_type: str = 'fast'):
     """
-    Fetches historical average fee data grouped by day of week and hour of day
-    for a heatmap visualization.
+    Fetches historical median fee data (with stddev) grouped by day of week and hour of day
+    for a heatmap visualization, based on user-selected fee type.
     """
     if days <= 0:
         raise HTTPException(status_code=400, detail="Days must be positive")
-    if days > 90:  # Limit to a reasonable historical range, e.g., 90 days
+    if days > 90:  # Limit to reasonable range
         days = 90
-        
-    query = """
+    
+    valid_fee_types = {'fast': 'fast_fee', 'medium': 'medium_fee', 'low': 'low_fee'}
+    if fee_type not in valid_fee_types:
+        raise HTTPException(status_code=400, detail="Invalid fee_type. Must be 'fast', 'medium', or 'low'.")
+    
+    fee_column = valid_fee_types[fee_type]
+    
+    query = f"""
         SELECT
-            EXTRACT(DOW FROM timestamp) AS day_of_week_num, -- 0=Sunday, 1=Monday, ..., 6=Saturday
+            EXTRACT(DOW FROM timestamp) AS day_of_week_num,  -- 0=Sunday, 1=Monday, ..., 6=Saturday
             EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC') AS hour_of_day,
-            CAST(AVG(fast_fee) AS NUMERIC(10,1)) AS avg_fee
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {fee_column}) AS median_fee,
+            STDDEV({fee_column}) AS fee_stddev
         FROM
             mempool_fee_histogram
         WHERE
@@ -326,35 +335,39 @@ def get_historical_fee_heatmap(days: int = 7):
         GROUP BY
             EXTRACT(DOW FROM timestamp),
             EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC')
+        HAVING COUNT(*) >= 1  -- Optional: Ensure at least N samples for reliability
         ORDER BY
             day_of_week_num,
             hour_of_day;
     """
-    # PostgreSQL EXTRACT(DOW) returns 0 for Sunday, 1 for Monday, etc.
-    # The frontend expects a specific mapping.
+    
+    # Day mapping (same as before)
     day_mapping = {
         0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat'
     }
-
-    raw_data = fetch_data(query, (f"{days} days",))
     
-    # Map numerical day of week to string day of week
+    # Execute query (adapt to your DB connection method)
+    raw_data = fetch_data(query, (f"{days} days",))  # Your fetch_data function
+    
+    # Process results
     heatmap_data = []
     for row in raw_data:
         day_num = int(row['day_of_week_num'])
         hour = int(row['hour_of_day'])
-        avg_fee = float(row['avg_fee'])
+        median_fee = float(row['median_fee']) if row['median_fee'] is not None else 0.0
+        fee_stddev = float(row['fee_stddev']) if row['fee_stddev'] is not None else 0.0
+        
         heatmap_data.append({
             "day": day_mapping.get(day_num, 'Unknown'),
             "hour": hour,
-            "avg_fee": avg_fee
+            "median_fee": median_fee,
+            "fee_stddev": fee_stddev
         })
     
     if not heatmap_data:
         raise HTTPException(status_code=404, detail="No historical fee data available for the specified range.")
-        
+    
     return heatmap_data
-
 
 # --- Endpoint to fetch latest mempool insights for the frontend ---
 @app.get('/mempool-insights')

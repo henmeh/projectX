@@ -44,7 +44,6 @@ const FeeHotspots = () => {
   const [error, setError] = useState(null);
   const [timeRange, setTimeRange] = useState('Last 7 Days');
   const [displayTimezone, setDisplayTimezone] = useState('UTC');
-  const [feeType, setFeeType] = useState('fast');
   const [hoveredCell, setHoveredCell] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
   const [activeCategory, setActiveCategory] = useState(null);
@@ -80,7 +79,7 @@ const FeeHotspots = () => {
       setError(null);
       try {
         const daysToFetch = timeRange === 'Last 30 Days' ? 30 : 7;
-        const rawHeatmapData = await fetchHistoricalFeeHeatmap(daysToFetch, feeType);
+        const rawHeatmapData = await fetchHistoricalFeeHeatmap(daysToFetch);
         
         if (!Array.isArray(rawHeatmapData) || rawHeatmapData.length === 0) {
           throw new Error("No historical heatmap data returned from API.");
@@ -169,12 +168,12 @@ const FeeHotspots = () => {
       }
     };
     loadHistoricalData();
-  }, [timeRange, feeType]);
+  }, [timeRange]);
 
   // Memoized calculations for performance
-  const { dataByDayHour, stats, bestTime, maxStddev } = useMemo(() => {
+  const { dataByDayHour, stats, bestTime } = useMemo(() => {
     if (!heatmapData || heatmapData.length === 0) {
-      return { dataByDayHour: new Map(), stats: null, bestTime: null, maxStddev: 0 };
+      return { dataByDayHour: new Map(), stats: null, bestTime: null };
     }
 
     const dataMap = new Map();
@@ -182,22 +181,20 @@ const FeeHotspots = () => {
     let maxFee = -Infinity;
     let totalFee = 0;
     let count = 0;
-    let maxStd = 0;
     let bestTimeCandidate = { fee: Infinity, day: '', fullDay: '', hour: 0 };
 
     heatmapData.forEach(d => {
       const key = `${d.day}-${d.hour}`;
       dataMap.set(key, d);
-      if (d.median_fee > 0) {
-        totalFee += d.median_fee;
+      if (d.avg_fee > 0) {
+        totalFee += d.avg_fee;
         count++;
-        if (d.median_fee < minFee) minFee = d.median_fee;
-        if (d.median_fee > maxFee) maxFee = d.median_fee;
+        if (d.avg_fee < minFee) minFee = d.avg_fee;
+        if (d.avg_fee > maxFee) maxFee = d.avg_fee;
 
-        if (d.median_fee < bestTimeCandidate.fee) {
-            bestTimeCandidate = { fee: d.median_fee, day: d.day, fullDay: d.fullDay || d.day, hour: d.hour };
+        if (d.avg_fee < bestTimeCandidate.fee) {
+            bestTimeCandidate = { fee: d.avg_fee, day: d.day, fullDay: d.fullDay || d.day, hour: d.hour };
         }
-        if (d.fee_stddev > maxStd) maxStd = d.fee_stddev;
       }
     });
     
@@ -207,7 +204,7 @@ const FeeHotspots = () => {
       avgFee: count > 0 ? totalFee / count : 0,
     };
 
-    return { dataByDayHour: dataMap, stats, bestTime: bestTimeCandidate, maxStddev: maxStd };
+    return { dataByDayHour: dataMap, stats, bestTime: bestTimeCandidate };
   }, [heatmapData]);
 
   // --- Timezone Adjusted Data ---
@@ -292,10 +289,8 @@ const FeeHotspots = () => {
         {dayNames.map((day, dayIndex) =>
           hours.map(hour => {
             const cellData = adjustedData.get(`${day}-${hour}`);
-            const fee = cellData ? cellData.median_fee : -1;
-            const stddev = cellData ? cellData.fee_stddev : 0;
+            const fee = cellData ? cellData.avg_fee : -1;
             const color = getFeeColor(fee, stats.minFee, stats.maxFee);
-            const opacity = maxStddev > 0 ? Math.max(0.5, 1 - (stddev / maxStddev) * 0.5) : 1;
             
             const isHovered = hoveredCell && hoveredCell.day === day && hoveredCell.hour === hour;
             const isDimmed = activeCategory && activeCategory !== getFeeCategory(fee, stats.minFee, stats.maxFee);
@@ -311,12 +306,11 @@ const FeeHotspots = () => {
                 rx={cornerRadius}
                 ry={cornerRadius}
                 fill={color}
-                opacity={isDimmed ? opacity * 0.2 : opacity}
-                className={`transition-all duration-200 ease-in-out ${isClaimed ? 'stroke-yellow-400 stroke-2' : ''}`}
+                className={`transition-all duration-200 ease-in-out ${isDimmed ? 'opacity-20' : 'opacity-100'} ${isClaimed ? 'stroke-yellow-400 stroke-2' : ''}`}
                 style={{ transformOrigin: 'center center' }}
                 transform={isHovered ? 'scale(1.01)' : 'scale(1)'}
                 onMouseEnter={(e) => {
-                  setHoveredCell({ day, fullDay: cellData?.adjustedFullDay || day, hour, fee: cellData?.median_fee, stddev: cellData?.fee_stddev, originalFullDay: cellData?.fullDay || cellData?.day, originalHour: cellData?.hour });
+                  setHoveredCell({ day, fullDay: cellData?.adjustedFullDay || day, hour, fee: cellData?.avg_fee, originalFullDay: cellData?.fullDay || cellData?.day, originalHour: cellData?.hour });
                   setTooltipPosition({ left: e.clientX + 10, top: e.clientY + 10 });
                 }}
                 onClick={() => {
@@ -387,7 +381,7 @@ const FeeHotspots = () => {
         {hoveredCell.fee > 0 ? (
             <>
                 <div className="text-3xl font-light mb-2">
-                    {hoveredCell.fee.toFixed(1)} ± {hoveredCell.stddev.toFixed(1)} <span className="text-xl">sat/vB</span>
+                    {hoveredCell.fee.toFixed(1)} <span className="text-xl">sat/vB</span>
                 </div>
                 <div className={`text-sm font-bold uppercase tracking-widest ${categoryColors[feeCategory]}`}>{feeCategory} Fees</div>
                 <div className="text-xs text-gray-400 mt-2">
@@ -412,7 +406,6 @@ const FeeHotspots = () => {
   return (
     <Card className="dashboard-card" title={<div><Title level={4} style={{ margin: 0 }}>Network Fee Hotspots</Title> <Text type="secondary">Find the best time to send by seeing when fees are typically high or low.</Text></div>}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Radio.Group options={['fast', 'medium', 'low']} value={feeType} onChange={(e) => setFeeType(e.target.value)} optionType='button' buttonStyle='solid'/>
         <Radio.Group options={['UTC', 'Local']} value={displayTimezone} onChange={(e) => setDisplayTimezone(e.target.value)} optionType='button' buttonStyle='solid'/>
         <Radio.Group options={['Last 7 Days', 'Last 30 Days']} value={timeRange} onChange={(e) => setTimeRange(e.target.value)} optionType="button" buttonStyle="solid"/>
         <Button onClick={shareOnX}>Share on X</Button>
@@ -463,7 +456,7 @@ const FeeHotspots = () => {
             </>
           }/>
         </Col>
-      </Row>
+    </Row>
 
       <Card 
         className="dashboard-card"
