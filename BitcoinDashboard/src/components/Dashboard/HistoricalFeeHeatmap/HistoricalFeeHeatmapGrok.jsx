@@ -198,7 +198,6 @@ const FeeHotspots = () => {
     if (!heatmapData || heatmapData.length === 0) {
       return { dataByDayHour: new Map(), stats: null, bestTime: null, maxStddev: 0 };
     }
-
     const dataMap = new Map();
     let minFee = Infinity;
     let maxFee = -Infinity;
@@ -231,6 +230,19 @@ const FeeHotspots = () => {
 
     return { dataByDayHour: dataMap, stats, bestTime: bestTimeCandidate, maxStddev: maxStd };
   }, [heatmapData]);
+
+  const adjustedBestTime = useMemo(() => {
+    if (displayTimezone === 'UTC') return bestTime;
+    const adjusted = {};
+    const offset = new Date().getTimezoneOffset() / 60;
+    const best_time= (bestTime.hour - offset + 24) % 24;
+    
+    adjusted.fee = bestTime.fee;
+    adjusted.fullDay = bestTime.fullDay;
+    adjusted.hour = best_time;
+    return adjusted;
+  
+    },[displayTimezone, bestTime]);
 
   // --- Timezone Adjusted Data ---
   const adjustedData = useMemo(() => {
@@ -458,9 +470,9 @@ const FeeHotspots = () => {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>
           <DataCard title="Smart Suggestion" data={
-            bestTime && (
+            adjustedBestTime && (
               <Text>
-                The cheapest time is typically around <Text strong>{bestTime.fullDay}, {String(bestTime.hour).padStart(2,'0')}:00 UTC</Text> with fees near <Text strong>{bestTime.fee.toFixed(1)} sat/vB</Text>.
+                The cheapest time is typically around <Text>{adjustedBestTime.fullDay}, {String(adjustedBestTime.hour).padStart(2,'0')}:00 {displayTimezone}. With fees near {adjustedBestTime.fee.toFixed(1)} sat/vB</Text>
               </Text>
             )
           }/>
