@@ -1,7 +1,6 @@
 import { Card, Tabs } from 'antd';
 import { PieChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import FeePredictions from "../FeePredictions/FeePredictions";
-import HistoricalFeeHeatmapAntDesign from '../HistoricalFeeHeatmap/HistoricalFeeHeatmapAntDesign';
 import FeeHeatmap from '../HistoricalFeeHeatmap/HistoricalFeeHeatmapGrok';
 
 

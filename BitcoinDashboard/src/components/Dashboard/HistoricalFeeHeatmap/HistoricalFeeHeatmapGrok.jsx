@@ -92,69 +92,53 @@ const FeeHotspots = () => {
         const rawFeePatternData = await fetchFeePattern();
         if (Array.isArray(rawFeePatternData) && rawFeePatternData.length > 0) {
           const patterns = {
-            high: { hours: {}, totalFee: 0, count: 0 },
-            medium: { hours: {}, totalFee: 0, count: 0 },
-            low: { hours: {}, totalFee: 0, count: 0 },
-            unknown: { hours: {}, totalFee: 0, count: 0 }
+            high: { ranges: {} },
+            medium: { ranges: {} },
+            low: { ranges: {} },
+            unknown: { ranges: {} }
           };
 
           rawFeePatternData.forEach(d => {
             const category = mapCategoryKey(d.fee_category);
             const dayNum = parseInt(d.day_of_week_num, 10);
-            const hour = parseInt(d.start_hour, 10);
+            const startHour = parseInt(d.start_hour, 10);
+            const endHour = parseInt(d.end_hour, 10);
             const avgFee = parseFloat(d.avg_fee_for_category);
 
-            if (patterns[category] && !isNaN(dayNum) && !isNaN(hour) && !isNaN(avgFee)) {
-              if (!patterns[category].hours[dayNum]) {
-                patterns[category].hours[dayNum] = new Set();
+            if (patterns[category] && !isNaN(dayNum) && !isNaN(startHour) && !isNaN(endHour) && !isNaN(avgFee)) {
+              if (!patterns[category].ranges[dayNum]) {
+                patterns[category].ranges[dayNum] = [];
               }
-              patterns[category].hours[dayNum].add(hour);
-              patterns[category].totalFee += avgFee;
-              patterns[category].count++;
+              patterns[category].ranges[dayNum].push({ start: startHour, end: endHour, avgFee });
             }
           });
 
           const formattedOutput = {};
           ['high', 'medium', 'low'].forEach(category => {
             const data = patterns[category];
-            if (data.count > 0) {
-              const avgCategoryFee = (data.totalFee / data.count).toFixed(2);
-              const daySummaries = [];
+            const daySummaries = [];
+            let totalFee = 0;
+            let count = 0;
 
-              const sortedDayNums = Object.keys(data.hours).map(Number).sort((a, b) => a - b);
+            const sortedDayNums = Object.keys(data.ranges).map(Number).sort((a, b) => a - b);
 
-              sortedDayNums.forEach(dayNum => {
-                const dayName = fullDayNames[dayNum];
-                const sortedHours = Array.from(data.hours[dayNum]).sort((a, b) => a - b);
-                
-                let hourRanges = [];
-                if (sortedHours.length > 0) {
-                  let startRange = sortedHours[0];
-                  let endRange = startRange;
-                  for (let i = 1; i < sortedHours.length; i++) {
-                    const currentHour = sortedHours[i];
-                    if (currentHour === endRange + 1) {
-                      endRange = currentHour;
-                    } else {
-                      hourRanges.push(startRange === endRange ? 
-                        `${String(startRange).padStart(2, '0')}:00` : 
-                        `${String(startRange).padStart(2, '0')}:00-${String(endRange).padStart(2, '0')}:00`);
-                      startRange = currentHour;
-                      endRange = currentHour;
-                    }
-                  }
-                  hourRanges.push(startRange === endRange ? 
-                    `${String(startRange).padStart(2, '0')}:00` : 
-                    `${String(startRange).padStart(2, '0')}:00-${String(endRange).padStart(2, '0')}:00`);
-                }
-                daySummaries.push(`${dayName}: ${hourRanges.join(', ')} UTC`);
+            sortedDayNums.forEach(dayNum => {
+              const dayName = fullDayNames[dayNum];
+              const dayRanges = data.ranges[dayNum].sort((a, b) => a.start - b.start);
+              const hourRanges = dayRanges.map(range => 
+                `${String(range.start).padStart(2, '0')}:00-${String(range.end).padStart(2, '0')}:00`
+              );
+              daySummaries.push(`${dayName}: ${hourRanges.join(', ')} UTC`);
+              dayRanges.forEach(range => {
+                totalFee += range.avgFee;
+                count++;
               });
-              
-              formattedOutput[category] = {
-                avgFee: avgCategoryFee,
-                times: daySummaries
-              };
-            }
+            });
+            
+            formattedOutput[category] = {
+              avgFee: count > 0 ? (totalFee / count).toFixed(2) : '0.00',
+              times: daySummaries
+            };
           });
           setCategorizedFeePatterns(formattedOutput);
         }
@@ -170,6 +154,44 @@ const FeeHotspots = () => {
     };
     loadHistoricalData();
   }, [timeRange, feeType]);
+
+  const adjustedFeePatterns = useMemo(() => {
+    if (!categorizedFeePatterns || displayTimezone === 'UTC') return categorizedFeePatterns;
+
+    const offset = new Date().getTimezoneOffset() / 60;
+    const adjusted = {};
+
+    Object.keys(categorizedFeePatterns).forEach(category => {
+      const original = categorizedFeePatterns[category];
+      const daySummaries = [];
+
+      original.times.forEach(timeStr => {
+        const [dayName, rangesStr] = timeStr.split(': ');
+        const dayIndex = fullDayNames.indexOf(dayName);
+        const ranges = rangesStr.split(', ').map(rangeStr => {
+          const [startStr, endStr] = rangeStr.split('-');
+          let start = parseInt(startStr.split(':')[0]);
+          let end = parseInt(endStr.split(':')[0]);
+
+          start = (start - offset + 24) % 24;
+          end = (end - offset + 24) % 24;
+
+          if (end <= start) end += 24;  // Handle wrap-around
+
+          return `${String(start).padStart(2, '0')}:00-${String(end % 24).padStart(2, '0')}:00`;
+        });
+
+        daySummaries.push(`${dayName}: ${ranges.join(', ')} Local`);
+      });
+
+      adjusted[category] = {
+        ...original,
+        times: daySummaries
+      };
+    });
+
+    return adjusted;
+  }, [categorizedFeePatterns, displayTimezone, fullDayNames]);
 
   // Memoized calculations for performance
   const { dataByDayHour, stats, bestTime, maxStddev } = useMemo(() => {
@@ -471,10 +493,10 @@ const FeeHotspots = () => {
         style={{ marginTop: 24 }}
       >            
         <Row gutter={16} style={{ marginBottom: 24 }}>
-          {categorizedFeePatterns && Object.keys(categorizedFeePatterns).length > 0 ? (
+          {adjustedFeePatterns && Object.keys(adjustedFeePatterns).length > 0 ? (
             <>
                 {['low', 'medium', 'high'].map(category => {
-                    const data = categorizedFeePatterns[category];
+                    const data = adjustedFeePatterns[category];
                     if (data && data.times.length > 0) { // Ensure there are times to display for the category
                         return (
                             <Col xs={24} sm={8} key={category}>

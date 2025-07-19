@@ -2,19 +2,22 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import numpy as np
-import datetime
+from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2 import Error as Psycopg2Error
-import joblib # For saving/loading models
-import itertools # Add this import at the top of your file
-from operator import itemgetter # Add this import as well
+from psycopg2.extras import execute_values  # For batch insert
+import joblib
+import itertools
+from operator import itemgetter
+from typing import Dict, List, Optional, Tuple
 
 class FeePatternAnalyzer:
     """
     A class to analyze historical Bitcoin transaction fee data, find patterns using K-Means clustering,
     and provide predictions and recommendations for optimal transaction times.
     """
-    def __init__(self, db_config, data_interval='6 months', n_clusters=3, model_path='fee_model.pkl', scaler_path='fee_scaler.pkl', category_map_path='fee_category_map.pkl'):
+    def __init__(self, db_config: Dict[str, any], data_interval: str = '6 months', n_clusters: int = 3,
+                 model_path: str = 'fee_model.pkl', scaler_path: str = 'fee_scaler.pkl', category_map_path: str = 'fee_category_map.pkl'):
         """
         Initializes the FeePatternAnalyzer.
 
@@ -33,31 +36,30 @@ class FeePatternAnalyzer:
         self.scaler_path = scaler_path
         self.category_map_path = category_map_path
 
-        self.kmeans_model = None
-        self.scaler = None
-        self.feature_cols = None
-        self.df_with_categories = None # Stores the historical DataFrame with cluster categories
-        self.cluster_id_to_category = None # Maps cluster IDs to human-readable categories
-        self.cluster_summary = None # Summary of cluster characteristics
+        self.kmeans_model: Optional[KMeans] = None
+        self.scaler: Optional[StandardScaler] = None
+        self.feature_cols: Optional[List[str]] = None
+        self.df_with_categories: Optional[pd.DataFrame] = None  # Stores the historical DataFrame with cluster categories
+        self.cluster_id_to_category: Optional[Dict[int, str]] = None  # Maps cluster IDs to human-readable categories
+        self.cluster_summary: Optional[Dict[str, Dict]] = None  # Summary of cluster characteristics
 
         # Day names for display, matching the 0=Sunday, 6=Saturday convention from DB
         self.day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-    def _load_and_prepare_data_from_db(self):
+
+    def _load_and_prepare_data_from_db(self) -> pd.DataFrame:
         """
         Connects to PostgreSQL using `self.db_config`, executes the specified query
         for `self.data_interval`, and prepares the data for analysis.
-        Ensures all 7 days * 24 hours slots are present, filling missing avg_fee with 0.
+        Ensures all 7 days * 24 hours slots are present, imputing missing avg_fee with global mean (instead of 0 to avoid skew).
 
         Returns:
             pandas.DataFrame: Prepared DataFrame with historical fee data.
         Raises:
-            Exception: If there's an error connecting to the database or executing the query.
+            ValueError: If query result missing required columns or data empty.
+            Psycopg2Error: On DB connection/query errors.
         """
-        conn = None
-        df = pd.DataFrame()
-        try:
-            conn = psycopg2.connect(**self.db_config)
+        with psycopg2.connect(**self.db_config) as conn:
             cursor = conn.cursor()
 
             query = """
@@ -81,33 +83,33 @@ class FeePatternAnalyzer:
             col_names = [desc[0] for desc in cursor.description]
             df = pd.DataFrame(records, columns=col_names)
 
-            if not all(col in df.columns for col in ['day_of_week_num', 'hour_of_day', 'avg_fee']):
-                raise ValueError("Query result must contain 'day_of_week_num', 'hour_of_day', 'avg_fee' columns.")
+        if df.empty:
+            raise ValueError("No historical fee data available for the specified interval.")
 
-            df['day_of_week_num'] = df['day_of_week_num'].astype(int)
-            df['hour_of_day'] = df['hour_of_day'].astype(int)
-            df['avg_fee'] = df['avg_fee'].astype(float)
+        if not all(col in df.columns for col in ['day_of_week_num', 'hour_of_day', 'avg_fee']):
+            raise ValueError("Query result must contain 'day_of_week_num', 'hour_of_day', 'avg_fee' columns.")
 
-            # Ensure all 7 days * 24 hours are present, filling gaps with 0
-            all_time_slots = pd.MultiIndex.from_product(
-                [range(7), range(24)], names=['day_of_week_num', 'hour_of_day']
-            ).to_frame(index=False)
+        df['day_of_week_num'] = df['day_of_week_num'].astype(int)
+        df['hour_of_day'] = df['hour_of_day'].astype(int)
+        df['avg_fee'] = df['avg_fee'].astype(float)
 
-            df = pd.merge(all_time_slots, df, on=['day_of_week_num', 'hour_of_day'], how='left')
-            df['avg_fee'] = df['avg_fee'].fillna(0) # Fill NaN from left join with 0
+        # Ensure all 7 days * 24 hours are present
+        all_time_slots = pd.MultiIndex.from_product(
+            [range(7), range(24)], names=['day_of_week_num', 'hour_of_day']
+        ).to_frame(index=False)
 
-            df['time_slot_id'] = df.apply(lambda row: f"{row['day_of_week_num']}-{row['hour_of_day']}", axis=1)
+        df = pd.merge(all_time_slots, df, on=['day_of_week_num', 'hour_of_day'], how='left')
+        
+        # Impute missing with global mean (better than 0 for clustering)
+        global_mean = df['avg_fee'].mean()
+        df['avg_fee'] = df['avg_fee'].fillna(global_mean if not pd.isna(global_mean) else 0)
 
-        except (Exception, Psycopg2Error) as error:
-            print(f"Error while connecting to PostgreSQL or executing query: {error}")
-            raise # Re-raise the exception to be caught by the caller
-        finally:
-            if conn:
-                cursor.close()
-                conn.close()
+        df['time_slot_id'] = df.apply(lambda row: f"{row['day_of_week_num']}-{row['hour_of_day']}", axis=1)
+
         return df
 
-    def _create_features(self, df):
+
+    def _create_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, StandardScaler, List[str]]:
         """
         Creates features suitable for clustering, including cyclical features for hour and day.
 
@@ -125,9 +127,10 @@ class FeePatternAnalyzer:
         features_df = df[['avg_fee', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos']]
         scaler = StandardScaler()
         scaled_features = scaler.fit_transform(features_df)
-        return scaled_features, scaler, features_df.columns
+        return scaled_features, scaler, list(features_df.columns)
 
-    def _perform_kmeans_clustering(self, scaled_data):
+
+    def _perform_kmeans_clustering(self, scaled_data: np.ndarray) -> KMeans:
         """
         Performs K-Means clustering on the scaled data.
 
@@ -137,11 +140,12 @@ class FeePatternAnalyzer:
         Returns:
             sklearn.cluster.KMeans: The fitted KMeans model.
         """
-        kmeans = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=10) # n_init for robust initialization
+        kmeans = KMeans(n_clusters=self.n_clusters, random_state=42, n_init=1)  # Reduce n_init for small data
         kmeans.fit(scaled_data)
         return kmeans
 
-    def _interpret_clusters(self, df, kmeans_model, feature_names):
+
+    def _interpret_clusters(self, df: pd.DataFrame, kmeans_model: KMeans, feature_names: List[str]) -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[int, str]]:
         """
         Interprets the clusters by calculating the average fee for each cluster and
         assigning meaningful categories ('Low Fee', 'Medium Fee', 'High Fee').
@@ -159,16 +163,11 @@ class FeePatternAnalyzer:
         cluster_fee_means = df.groupby('cluster_label')['avg_fee'].mean().sort_values()
 
         # Dynamic categorization based on number of clusters
-        fee_categories = []
+        fee_categories = [f'Fee Level {i+1}' for i in range(self.n_clusters)]  # General for >3 clusters
         if self.n_clusters == 2:
             fee_categories = ['Low Fee', 'High Fee']
         elif self.n_clusters == 3:
             fee_categories = ['Low Fee', 'Medium Fee', 'High Fee']
-        elif self.n_clusters > 3:
-            fee_categories = [f'Fee Category {i+1}' for i in range(self.n_clusters)]
-        else: # Should not happen with n_clusters >= 2
-             fee_categories = [f'Category {i+1}' for i in range(self.n_clusters)]
-
 
         cluster_to_category = {cluster_id: category for cluster_id, category in zip(cluster_fee_means.index, fee_categories)}
         df['fee_category'] = df['cluster_label'].map(cluster_to_category)
@@ -183,7 +182,8 @@ class FeePatternAnalyzer:
         }
         return df, cluster_info, cluster_to_category
 
-    def _get_fee_prediction_raw(self, day_of_week_num, hour_of_day):
+
+    def _get_fee_prediction_raw(self, day_of_week_num: int, hour_of_day: int) -> int:
         """
         Internal helper to get the raw cluster ID prediction for a given time.
 
@@ -200,7 +200,6 @@ class FeePatternAnalyzer:
             raise RuntimeError("Model is not trained or loaded. Call .run() first (with train_model=True or False).")
 
         # Use the historical average fee for that specific time slot as a placeholder for prediction
-        # This helps the prediction be consistent with the historical patterns the model learned.
         historical_avg_fee_for_slot = self.df_with_categories[
             (self.df_with_categories['day_of_week_num'] == day_of_week_num) &
             (self.df_with_categories['hour_of_day'] == hour_of_day)
@@ -228,7 +227,7 @@ class FeePatternAnalyzer:
         predicted_cluster = self.kmeans_model.predict(scaled_input)[0]
         return predicted_cluster
 
-    def save_model(self):
+    def save_model(self) -> None:
         """Saves the trained model components (KMeans model, StandardScaler, category map) to disk."""
         try:
             joblib.dump(self.kmeans_model, self.model_path)
@@ -238,7 +237,8 @@ class FeePatternAnalyzer:
         except Exception as e:
             print(f"Error saving model: {e}")
 
-    def load_model(self):
+
+    def load_model(self) -> bool:
         """
         Loads the trained model components from disk.
         Returns True if successful, False otherwise.
@@ -255,8 +255,9 @@ class FeePatternAnalyzer:
         except Exception as e:
             print(f"Error loading model: {e}")
             return False
+        
 
-    def run(self, train_model=True):
+    def run(self, train_model: bool = True) -> bool:
         """
         Starts the complete fee pattern analysis process. This is the main entry point.
 
@@ -329,7 +330,8 @@ class FeePatternAnalyzer:
                     print("Predictions might use a less accurate global average fee if specific historical slot data is missing.")
             return success
 
-    def predict_fee_category(self, day_of_week_num, hour_of_day):
+
+    def predict_fee_category(self, day_of_week_num: int, hour_of_day: int) -> str:
         """
         Predicts the fee category ('Low Fee', 'Medium Fee', 'High Fee') for a specific time.
         Requires the model to be trained or loaded first (by calling `run()`).
@@ -351,7 +353,8 @@ class FeePatternAnalyzer:
             print(f"An unexpected error occurred during prediction: {e}")
             return "Error: Prediction failed"
 
-    def get_low_fee_recommendations(self, num_hours_ahead=24):
+
+    def get_low_fee_recommendations(self, num_hours_ahead: int = 24) -> List[str]:
         """
         Provides recommendations for 'Low Fee' transaction times in the upcoming hours,
         based on historical patterns identified by the model.
@@ -381,11 +384,11 @@ class FeePatternAnalyzer:
         low_fee_slots_data = self.df_with_categories[self.df_with_categories['cluster_label'] == low_fee_cluster_id].copy()
 
         recommended_future_times = []
-        now_utc = datetime.datetime.utcnow()
+        now_utc = datetime.now(timezone.utc)
         current_day_num_db_format = (now_utc.weekday() + 1) % 7 # Convert Python's Monday=0 to DB's Sunday=0
 
         for i in range(num_hours_ahead):
-            check_time_utc = now_utc + datetime.timedelta(hours=i)
+            check_time_utc = now_utc + timedelta(hours=i)
             check_day_num_db_format = (check_time_utc.weekday() + 1) % 7
             check_hour = check_time_utc.hour
 
@@ -411,7 +414,8 @@ class FeePatternAnalyzer:
                 )
         return recommended_future_times
 
-    def get_overall_fee_patterns(self):
+
+    def get_overall_fee_patterns(self) -> Dict[str, List[str]]:
         """
         Summarizes the identified fee patterns (Low, Medium, High) into human-readable descriptions.
         This provides the "Wednesday afternoon is cheap" type of information.
@@ -472,8 +476,7 @@ class FeePatternAnalyzer:
         return patterns_summary
     
 
-    # (Inside your FeePatternAnalyzer class)
-    def store_fee_pattern(self):
+    def store_fee_pattern(self) -> None:
         """
         Finds continuous blocks of hours for each fee category and stores these compact
         ranges in a PostgreSQL database. The stored end_hour is exclusive.
@@ -482,61 +485,49 @@ class FeePatternAnalyzer:
             print("Analysis results not found. Cannot store patterns. Run analysis first.")
             return
 
-        conn = None
-        
         records_to_insert = []
-        analyze_time = datetime.datetime.now()
+        analyze_time = datetime.now(timezone.utc)
+
+        for category, info in self.cluster_summary.items():
+            category_avg_fee = info.get('avg_fee', 0.0)
+            
+            times_by_day = sorted(info.get('times_in_category', []), key=itemgetter('day_of_week_num'))
+            for day_num, day_slots in itertools.groupby(times_by_day, key=itemgetter('day_of_week_num')):
+                
+                hours = sorted([slot['hour_of_day'] for slot in day_slots])
+                if not hours:
+                    continue
+
+                for _, group in itertools.groupby(enumerate(hours), lambda x: x[0] - x[1]):
+                    hour_block = [item[1] for item in group]
+                    start_hour = hour_block[0]
+                    end_hour = hour_block[-1] + 1
+                    
+                    records_to_insert.append((
+                        analyze_time,
+                        category,
+                        day_num,
+                        start_hour,
+                        end_hour,
+                        float(category_avg_fee)
+                    ))
+        
+        if not records_to_insert:
+            print("No pattern data available to store.")
+            return
 
         try:
-            conn = psycopg2.connect(**self.db_config)
-            cursor = conn.cursor()
-
-            for category, info in self.cluster_summary.items():
-                category_avg_fee = info.get('avg_fee', 0.0)
-                
-                times_by_day = sorted(info.get('times_in_category', []), key=itemgetter('day_of_week_num'))
-                for day_num, day_slots in itertools.groupby(times_by_day, key=itemgetter('day_of_week_num')):
-                    
-                    hours = sorted([slot['hour_of_day'] for slot in day_slots])
-                    if not hours:
-                        continue
-
-                    for _, group in itertools.groupby(enumerate(hours), lambda x: x[0] - x[1]):
-                        hour_block = [item[1] for item in group]
-                        start_hour = hour_block[0]
-                        end_hour = hour_block[-1] + 1
-                        
-                        records_to_insert.append((
-                            analyze_time,
-                            category,
-                            day_num,
-                            start_hour,
-                            end_hour,
-                            float(category_avg_fee)
-                        ))
-            
-            if not records_to_insert:
-                print("No pattern data available to store.")
-                return
-
-            insert_query = """
-            INSERT INTO fee_pattern (analysis_timestamp, fee_category, day_of_week_num, start_hour, end_hour, avg_fee_for_category)
-            VALUES (%s, %s, %s, %s, %s, %s);
-            """
-            cursor.executemany(insert_query, records_to_insert)
-            conn.commit()
-
+            with psycopg2.connect(**self.db_config) as conn:
+                with conn.cursor() as cursor:
+                    insert_query = """
+                    INSERT INTO fee_pattern (analysis_timestamp, fee_category, day_of_week_num, start_hour, end_hour, avg_fee_for_category)
+                    VALUES %s;
+                    """
+                    execute_values(cursor, insert_query, records_to_insert)
+                    conn.commit()
             print(f"✅ Successfully stored {len(records_to_insert)} compact fee pattern ranges in the database.")
-
-
         except (Exception, Psycopg2Error) as error:
             print(f"❌ Error during database operation: {error}")
-            if conn:
-                conn.rollback()
-        finally:
-            if conn:
-                cursor.close()
-                conn.close()
 
 
 # --- Example Usage (demonstrates how to call the class) ---
