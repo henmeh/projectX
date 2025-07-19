@@ -81,6 +81,7 @@ const FeeHotspots = () => {
       try {
         const daysToFetch = timeRange === 'Last 30 Days' ? 30 : 7;
         const rawHeatmapData = await fetchHistoricalFeeHeatmap(daysToFetch, feeType);
+        console.log(rawHeatmapData);
         
         if (!Array.isArray(rawHeatmapData) || rawHeatmapData.length === 0) {
           throw new Error("No historical heatmap data returned from API.");
@@ -247,6 +248,7 @@ const FeeHotspots = () => {
   // --- Timezone Adjusted Data ---
   const adjustedData = useMemo(() => {
     const offset = displayTimezone === 'Local' ? new Date().getTimezoneOffset() / 60 : 0;
+    console.log(offset);
     const adjustedMap = new Map();
 
     for (const [key, value] of dataByDayHour.entries()) {

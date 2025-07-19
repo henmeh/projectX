@@ -324,7 +324,7 @@ def get_historical_fee_heatmap(days: int = 7, fee_type: str = 'fast'):
     
     query = f"""
         SELECT
-            EXTRACT(DOW FROM timestamp) AS day_of_week_num,  -- 0=Sunday, 1=Monday, ..., 6=Saturday
+            EXTRACT(DOW FROM timestamp AT TIME ZONE 'UTC') AS day_of_week_num,  -- 0=Sunday, 1=Monday, ..., 6=Saturday
             EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC') AS hour_of_day,
             PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY {fee_column}) AS median_fee,
             STDDEV({fee_column}) AS fee_stddev
@@ -333,7 +333,7 @@ def get_historical_fee_heatmap(days: int = 7, fee_type: str = 'fast'):
         WHERE
             timestamp >= NOW() - INTERVAL %s
         GROUP BY
-            EXTRACT(DOW FROM timestamp),
+            EXTRACT(DOW FROM timestamp AT TIME ZONE 'UTC'),
             EXTRACT(HOUR FROM timestamp AT TIME ZONE 'UTC')
         HAVING COUNT(*) >= 1  -- Optional: Ensure at least N samples for reliability
         ORDER BY
