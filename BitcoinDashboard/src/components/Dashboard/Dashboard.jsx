@@ -1,10 +1,8 @@
-import React from 'react';
 import { Layout } from 'antd';
-import WhaleTransactions from './WhaleTransactions/WhaleTransactions';
 import { useAppContext } from '../../context/AppContext';
 import './Dashboard.css';
-import MempoolInsights from './MempoolInsights/MempoolInsights';
 import FeeStatistics from './FeeStatistics/FeeStatistics';
+import Mempool from './Mempool./Mempool';
 
 
 const { Content } = Layout;
@@ -14,14 +12,12 @@ const Dashboard = () => {
   
   const renderActiveView = () => {
     switch(activeView) {
-      case 'whale-transactions':
-        return <WhaleTransactions />;
-      case 'fee-histogram':
-        return <MempoolInsights />;
+      case 'mempool':
+        return <Mempool />;
       case 'fee-statistics':
         return <FeeStatistics />;
       default:
-        return <WhaleTransactions />;
+        return <Mempool />;
     }
   };
   

@@ -81,7 +81,6 @@ const FeeHotspots = () => {
       try {
         const daysToFetch = timeRange === 'Last 30 Days' ? 30 : 7;
         const rawHeatmapData = await fetchHistoricalFeeHeatmap(daysToFetch, feeType);
-        console.log(rawHeatmapData);
         
         if (!Array.isArray(rawHeatmapData) || rawHeatmapData.length === 0) {
           throw new Error("No historical heatmap data returned from API.");
@@ -168,7 +167,7 @@ const FeeHotspots = () => {
 
       original.times.forEach(timeStr => {
         const [dayName, rangesStr] = timeStr.split(': ');
-        const dayIndex = fullDayNames.indexOf(dayName);
+        //const dayIndex = fullDayNames.indexOf(dayName);
         const ranges = rangesStr.split(', ').map(rangeStr => {
           const [startStr, endStr] = rangeStr.split('-');
           let start = parseInt(startStr.split(':')[0]);
@@ -232,27 +231,39 @@ const FeeHotspots = () => {
     return { dataByDayHour: dataMap, stats, bestTime: bestTimeCandidate, maxStddev: maxStd };
   }, [heatmapData]);
 
-  const adjustedBestTime = useMemo(() => {
+/*  const adjustedBestTime = useMemo(() => {
     if (displayTimezone === 'UTC') return bestTime;
     const adjusted = {};
     const offset = new Date().getTimezoneOffset() / 60;
-    const best_time= (bestTime.hour - offset + 24) % 24;
+    
+    let adjustedHour = bestTime.hour - offset;
+    let adjustedDayIndex = dayNames.indexOf(bestTime.day);
+    console.log(adjustedDayIndex);
+
+    if (adjustedHour < 0) {
+    adjustedHour += 24;
+    adjustedDayIndex = (adjustedDayIndex - 1 + 7) % 7;
+    } else if (adjustedHour >= 24) {
+    adjustedHour -= 24;
+    adjustedDayIndex = (adjustedDayIndex + 1) % 7;
+    }
     
     adjusted.fee = bestTime.fee;
-    adjusted.fullDay = bestTime.fullDay;
-    adjusted.hour = best_time;
+    adjusted.hour = adjustedHour;
+    adjusted.day = dayNames[adjustedDayIndex];
+    adjusted.adjustedFullDay = fullDayNames[adjustedDayIndex];
+
     return adjusted;
   
     },[displayTimezone, bestTime]);
-
+*/
   // --- Timezone Adjusted Data ---
   const adjustedData = useMemo(() => {
     const offset = displayTimezone === 'Local' ? new Date().getTimezoneOffset() / 60 : 0;
-    console.log(offset);
     const adjustedMap = new Map();
 
-    for (const [key, value] of dataByDayHour.entries()) {
-      let { day, hour, fullDay } = value;
+    for (const [_, value] of dataByDayHour.entries()) {
+      let { day, hour, _ } = value;
       let dayIndex = dayNames.indexOf(day);
 
       let adjustedHour = hour - offset;
@@ -469,8 +480,8 @@ const FeeHotspots = () => {
         <Col xs={24} sm={8}><DataCard title="Highest Fee" data={`${stats.maxFee.toFixed(1)} sat/vB`}/></Col>
       </Row>
 
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={8}>
+      {/*<Row gutter={16} style={{ marginBottom: 24 }}>
+        {/*<Col xs={24} sm={8}>
           <DataCard title="Smart Suggestion" data={
             adjustedBestTime && (
               <Text>
@@ -478,8 +489,8 @@ const FeeHotspots = () => {
               </Text>
             )
           }/>
-        </Col>
-        <Col xs={24} sm={8}>
+        </Col>*
+        <Col xs={24} sm={8}>*/}
           <DataCard title="Savings Optimizer" data={
             <>
               <QuestionCircleOutlined 
@@ -498,8 +509,8 @@ const FeeHotspots = () => {
               <Text block style={{ marginTop: 8 }}>Click low-fee cells to claim!</Text>
             </>
           }/>
-        </Col>
-      </Row>
+        {/*</Col>
+      </Row>*/}
 
       <Card 
         className="dashboard-card"

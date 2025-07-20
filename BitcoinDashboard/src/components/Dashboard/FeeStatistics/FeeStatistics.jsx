@@ -8,13 +8,13 @@ const FeeStatistics = () => {
   const items = [
     {
       key: '1',
-      label: <><PieChartOutlined /> Current Market Fees / Fee Predictions</>,
-      children: <FeePredictions />,
+      label: <><ClockCircleOutlined /> Historical Patterns</>,
+      children: <FeeHeatmap />,
     },
     {
       key: '2',
-      label: <><ClockCircleOutlined /> Historical Patterns</>,
-      children: <FeeHeatmap />,
+      label: <><PieChartOutlined /> Current Market Fees / Fee Predictions</>,
+      children: <FeePredictions />,
     },
   ];
 
