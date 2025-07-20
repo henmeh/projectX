@@ -10,6 +10,7 @@ import joblib
 import itertools
 from operator import itemgetter
 from typing import Dict, List, Optional, Tuple
+from pathlib import Path
 
 class FeePatternAnalyzer:
     """
@@ -17,7 +18,7 @@ class FeePatternAnalyzer:
     and provide predictions and recommendations for optimal transaction times.
     """
     def __init__(self, db_config: Dict[str, any], data_interval: str = '6 months', n_clusters: int = 3,
-                 model_path: str = 'trained_models_pattern/fee_model.pkl', scaler_path: str = 'trained_models_pattern/fee_scaler.pkl', category_map_path: str = 'trained_models_pattern/fee_category_map.pkl'):
+                 model_path: Optional[str] = None, scaler_path: Optional[str] = None, category_map_path: Optional[str] = None):
         """
         Initializes the FeePatternAnalyzer.
 
@@ -32,9 +33,16 @@ class FeePatternAnalyzer:
         self.db_config = db_config
         self.data_interval = data_interval
         self.n_clusters = n_clusters
-        self.model_path = model_path
-        self.scaler_path = scaler_path
-        self.category_map_path = category_map_path
+        # --- Path handling ---
+        # Determine project root. Assumes this file is in project_root/src/FeePredictor/
+        project_root = Path(__file__).resolve().parent
+        default_model_dir = project_root / "trained_models_pattern"
+        default_model_dir.mkdir(parents=True, exist_ok=True)  # Ensure the directory exists
+
+        self.model_path = model_path or str(default_model_dir / "fee_model.pkl")
+        self.scaler_path = scaler_path or str(default_model_dir / "fee_scaler.pkl")
+        self.category_map_path = category_map_path or str(default_model_dir / "fee_category_map.pkl")
+
 
         self.kmeans_model: Optional[KMeans] = None
         self.scaler: Optional[StandardScaler] = None
@@ -105,7 +113,7 @@ class FeePatternAnalyzer:
         global_mean = df['avg_fee'].mean()
         df['avg_fee'] = df['avg_fee'].fillna(global_mean if not pd.isna(global_mean) else 0)
         """
-        
+
         df['time_slot_id'] = df.apply(lambda row: f"{row['day_of_week_num']}-{row['hour_of_day']}", axis=1)
 
         return df
@@ -253,6 +261,7 @@ class FeePatternAnalyzer:
             return True
         except FileNotFoundError:
             print("Model files not found. Please train the model first or check paths.")
+            print(self.model_path)
             return False
         except Exception as e:
             print(f"Error loading model: {e}")
@@ -546,7 +555,6 @@ if __name__ == "__main__":
 
     # Initialize the analyzer.
     analyzer = FeePatternAnalyzer(db_config, data_interval='6 months', n_clusters=3)
-
     # --- Step 1: Run the analysis to train a new model ---
     # This ensures we are working with the latest fee patterns from the database.
     print("\n----- Running Fee Pattern Analysis -----")

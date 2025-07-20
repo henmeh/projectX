@@ -2,6 +2,7 @@ import { Card, Tabs } from 'antd';
 import { PieChartOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import FeePredictions from "../FeePredictions/FeePredictions";
 import FeeHeatmap from '../HistoricalFeeHeatmap/HistoricalFeeHeatmapGrok';
+import LNOptimizer from '../LNOptimizer/LNOptimizer';
 
 
 const FeeStatistics = () => {
@@ -15,6 +16,11 @@ const FeeStatistics = () => {
       key: '2',
       label: <><PieChartOutlined /> Current Market Fees / Fee Predictions</>,
       children: <FeePredictions />,
+    },
+    {
+      key: '3',
+      label: <><PieChartOutlined /> LN Channel Optimizer</>,
+      children: <LNOptimizer />,
     },
   ];
 

@@ -8,7 +8,10 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 import uvicorn
-from typing import List, Dict, Any
+from pydantic import BaseModel
+import sys
+sys.path.append('/media/henning/Volume/Programming/projectX/src/')
+from LightningNetwork.lc_channel_optimizer import LNChannelOptimizer
 
 
 # Initialize FastAPI app
@@ -419,6 +422,26 @@ def get_fee_pattern():
         return result
     raise HTTPException(status_code=404, detail="No fee pattern data available")
 
+
+@app.get("/optimize-ln-channel/{channel_size}_{duration}")
+async def optimize_ln_channel(channel_size=140, duration=30):
+    try:
+        db_config = {
+        'host': 'localhost',        # e.g., 'localhost' or an IP address
+        'database': 'bitcoin_blockchain',
+        'user': 'postgres',
+        'password': 'projectX',
+        'port': 5432                # Default PostgreSQL port
+        }
+        optimizer = LNChannelOptimizer(db_config)  # Init and load model on startup
+
+        result = optimizer.optimize_ln_channel(int(channel_size), int(duration))
+        return result
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise HTTPException(500, "Internal server error")
 
 
 if __name__ == "__main__":
