@@ -17,7 +17,7 @@ class FeePatternAnalyzer:
     and provide predictions and recommendations for optimal transaction times.
     """
     def __init__(self, db_config: Dict[str, any], data_interval: str = '6 months', n_clusters: int = 3,
-                 model_path: str = 'fee_model.pkl', scaler_path: str = 'fee_scaler.pkl', category_map_path: str = 'fee_category_map.pkl'):
+                 model_path: str = 'trained_models_pattern/fee_model.pkl', scaler_path: str = 'trained_models_pattern/fee_scaler.pkl', category_map_path: str = 'trained_models_pattern/fee_category_map.pkl'):
         """
         Initializes the FeePatternAnalyzer.
 
@@ -93,6 +93,7 @@ class FeePatternAnalyzer:
         df['hour_of_day'] = df['hour_of_day'].astype(int)
         df['avg_fee'] = df['avg_fee'].astype(float)
 
+        """
         # Ensure all 7 days * 24 hours are present
         all_time_slots = pd.MultiIndex.from_product(
             [range(7), range(24)], names=['day_of_week_num', 'hour_of_day']
@@ -103,7 +104,8 @@ class FeePatternAnalyzer:
         # Impute missing with global mean (better than 0 for clustering)
         global_mean = df['avg_fee'].mean()
         df['avg_fee'] = df['avg_fee'].fillna(global_mean if not pd.isna(global_mean) else 0)
-
+        """
+        
         df['time_slot_id'] = df.apply(lambda row: f"{row['day_of_week_num']}-{row['hour_of_day']}", axis=1)
 
         return df
