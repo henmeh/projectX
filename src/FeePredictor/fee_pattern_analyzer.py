@@ -331,7 +331,7 @@ class FeePatternAnalyzer:
                     # This might be slightly off if new data significantly changes underlying patterns
                     # but model isn't retrained. For strict consistency, df_with_categories should also be saved.
                     # For now, let's derive it:
-                    scaled_features_for_load_context, _, _ = self._create_features(df_historical_for_load_context.copy())
+                    _, self.scaler, self.feature_cols = self._create_features(df_historical_for_load_context)
                     self.df_with_categories, self.cluster_summary, self.cluster_id_to_category = self._interpret_clusters(
                         df_historical_for_load_context.copy(), self.kmeans_model, self.feature_cols
                     )
@@ -555,10 +555,18 @@ if __name__ == "__main__":
 
     # Initialize the analyzer.
     analyzer = FeePatternAnalyzer(db_config, data_interval='6 months', n_clusters=3)
+    #analyzer.load_model()
+    #analyzer.interpret_clusters(self, df: pd.DataFrame, kmeans_model: KMeans, feature_names: List[str]) -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[int, str]]:
+
+    analyzer.run(train_model=False)
+    test = analyzer.get_low_fee_recommendations()
+    print(test)
+
+    """
     # --- Step 1: Run the analysis to train a new model ---
-    # This ensures we are working with the latest fee patterns from the database.
+    # This ensures we are working with the latest fee patterns from the database.    
     print("\n----- Running Fee Pattern Analysis -----")
-    if analyzer.run(train_model=True):
+    if analyzer.run(train_model=False):
         print("\nAnalysis successful. Model is trained and ready.")
 
         # --- Step 2: Display the overall patterns for each fee category ---
@@ -580,3 +588,4 @@ if __name__ == "__main__":
     else:
         print("\nAnalysis failed. Check database connection and if sufficient data exists.")
         print("Exiting, as the model could not be trained.")
+    """

@@ -11,7 +11,7 @@ import uvicorn
 from pydantic import BaseModel
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
-from LightningNetwork.lc_channel_optimizer import LNChannelOptimizer
+from LightningNetwork.ln_channel_optimizer import LNChannelOptimizer
 
 
 # Initialize FastAPI app

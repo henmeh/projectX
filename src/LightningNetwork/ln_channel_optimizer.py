@@ -17,13 +17,7 @@ class LNChannelOptimizer(FeePatternAnalyzer):
     """
     def __init__(self, db_config: Dict[str, any]):
         super().__init__(db_config)  # Call parent init
-        self.run(train_model=True)
-        # Optional: Reload df_with_categories if needed for predictions
-        self.df_with_categories = self._load_and_prepare_data_from_db()
-        scaled_features, _, _ = self._create_features(self.df_with_categories.copy())
-        self.df_with_categories, self.cluster_summary, self.cluster_id_to_category = self._interpret_clusters(
-            self.df_with_categories.copy(), self.kmeans_model, self.feature_cols
-        )
+        self.run(train_model=False)
         self.db_params = {
             "dbname": "bitcoin_blockchain",
             "user": "postgres",
