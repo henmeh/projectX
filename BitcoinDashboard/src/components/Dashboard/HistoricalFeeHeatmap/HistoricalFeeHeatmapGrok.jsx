@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import html2canvas from 'html2canvas'; // Install via npm i html2canvas
-import { Card, Typography, Row, Col, Radio, Button, Input, Alert, Skeleton, Modal } from 'antd';
+import { Card, Typography, Row, Col, Radio, Button, Alert, Skeleton, Modal } from 'antd';
 import { InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import { fetchHistoricalFeeHeatmap, fetchFeePattern } from '../../../services/api.js';
 import "../Dashboard.css";
 import "../FeePredictions/FeePredictions.css";
 import DataCard from '../../DataCard/DataCard.jsx';
+import LNOptimizer from '../LNOptimizer/LNOptimizer.jsx';
 
 const { Title, Text } = Typography;
 
@@ -379,41 +380,56 @@ const FeeHotspots = () => {
         )}
       </svg>
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={4}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('low')} onMouseLeave={() => setActiveCategory(null)}>
-                <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#003366' }}></div>
-                <Text>Very Low Fees</Text>
+              <Text>Low Fees</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('extremely low')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#003366', marginRight: 10, marginLeft: 10 }}></div>  
               </div>
-        </Col>
-              <Col xs={24} sm={4}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('low')} onMouseLeave={() => setActiveCategory(null)}>
-                <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#00e1a4' }}></div>
-                <Text>Low Fees</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('very very low')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#00a9ff', marginRight: 10 }}></div>
               </div>
-                         </Col>
-              <Col xs={24} sm={4}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('very low')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#66c2ff', marginRight: 10 }}></div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('low')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#00e1a4', marginRight: 10}}></div>  
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('medium')} onMouseLeave={() => setActiveCategory(null)}>
-                <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff200' }}></div>
-                <Text>Medium Fees</Text>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#99ffcc', marginRight: 10}}></div>  
               </div>
-              </Col>
-              <Col xs={24} sm={4}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('medium high')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#fff200', marginRight: 10 }}></div>  
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('high')} onMouseLeave={() => setActiveCategory(null)}>
-                <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ff005d' }}></div>
-                <Text>High Fees</Text>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ffd700', marginRight: 10 }}></div>  
               </div>
-              </Col>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('very high')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ff8c00', marginRight: 10 }}></div>  
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('very very high')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ff4500', marginRight: 10 }}></div>  
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} onMouseEnter={() => setActiveCategory('extremely high')} onMouseLeave={() => setActiveCategory(null)}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: '#ff005d', marginRight: 10 }}></div>
+              <Text>High Fees</Text>
+              </div>
       </Row> 
       </div>
     );
   };
-  
+
   const getFeeCategory = (fee, min, max) => {
     if (fee < 0) return 'unknown';
     const ratio = (fee - min) / (max - min);
-    if (ratio < 0.33) return 'low';
-    if (ratio < 0.66) return 'medium';
-    return 'high';
+    if (ratio < 0.1) return 'extremely low'; // Very dark blue (extremely low)
+    if (ratio < 0.2) return 'very very low'; // Deep blue (very low)
+    if (ratio < 0.3) return 'very low'; // Light blue
+    if (ratio < 0.4) return 'low'; // Green (low)
+    if (ratio < 0.5) return 'medium'; // Light green
+    if (ratio < 0.6) return 'medium high'; // Yellow (medium)
+    if (ratio < 0.7) return 'high'; // Gold yellow
+    if (ratio < 0.8) return 'very high'; // Orange (high)
+    if (ratio < 0.9) return 'very very high'; // Red-orange
+    return 'extremely high';
   };
 
   const renderTooltip = () => {
@@ -491,6 +507,8 @@ const FeeHotspots = () => {
           }/>
         </Col>*
         <Col xs={24} sm={8}>*/}
+        <LNOptimizer/>
+        {/*
           <DataCard title="Savings Optimizer" data={
             <>
               <QuestionCircleOutlined 

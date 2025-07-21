@@ -412,13 +412,15 @@ class FeePatternAnalyzer:
                 continue # Skip this time slot if model not ready
 
             if predicted_cluster_id_for_future == low_fee_cluster_id:
-                # Find the average fee for this specific slot from the historical data for display
                 avg_fee_for_display = low_fee_slots_data[
                     (low_fee_slots_data['day_of_week_num'] == check_day_num_db_format) &
                     (low_fee_slots_data['hour_of_day'] == check_hour)
                 ]['avg_fee'].mean()
 
-                fee_str = f"Avg Fee: {avg_fee_for_display:.1f} sat/vB" if not pd.isna(avg_fee_for_display) else "Fee: N/A"
+                if pd.isna(avg_fee_for_display) or avg_fee_for_display <= 0:
+                    continue  # Skip invalid/N/A
+
+                fee_str = f"Avg Fee: {avg_fee_for_display:.1f} sat/vB"
 
                 recommended_future_times.append(
                     f"{self.day_names[check_day_num_db_format]} {str(check_hour).zfill(2)}:00 UTC ({fee_str})"
@@ -558,7 +560,7 @@ if __name__ == "__main__":
     #analyzer.load_model()
     #analyzer.interpret_clusters(self, df: pd.DataFrame, kmeans_model: KMeans, feature_names: List[str]) -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[int, str]]:
 
-    analyzer.run(train_model=False)
+    analyzer.run(train_model=True)
     test = analyzer.get_low_fee_recommendations()
     print(test)
 

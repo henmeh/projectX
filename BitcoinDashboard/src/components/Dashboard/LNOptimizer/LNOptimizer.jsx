@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { App, Card, Form, InputNumber, Button, Table, message } from 'antd';
+import { App, Card, Form, InputNumber, Button, Table, Row, Col } from 'antd';
 import axios from 'axios';  // npm i axios
 
 const LNOptimizer = () => {
@@ -38,14 +38,22 @@ const LNOptimizer = () => {
   return (
     <App>  {/* Wrap with App for context */}
       <Card title="Lightning Channel Optimizer">
-        <Form form={form} onFinish={onFinish} layout="vertical" initialValues={{ channel_size_vb: 140, duration_days: 30 }}>
-          <Form.Item name="channel_size_vb" label="Channel Tx Size (vB)">
-            <InputNumber min={100} max={1000} />
-          </Form.Item>
-          <Form.Item name="duration_days" label="Channel Duration (days)">
-            <InputNumber min={1} max={365} />
-          </Form.Item>
-          <Button type="primary" htmlType="submit" loading={loading}>Optimize</Button>
+        <Form form={form} onFinish={onFinish} layout="horizontal" initialValues={{ channel_size_vb: 140, duration_days: 30 }}>
+          <Row gutter={16}>
+            <Col xs={24} sm={8}>
+                <Form.Item name="channel_size_vb" label="Channel Tx Size (vB)">
+                    <InputNumber min={100} max={1000} />
+                </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+                <Form.Item name="duration_days" label="Channel Duration (days)">
+                    <InputNumber min={1} max={365} />
+                </Form.Item>
+            </Col>
+            <Col xs={24} sm={8}>
+                <Button type="primary" htmlType="submit" loading={loading}>Optimize</Button>
+            </Col>
+          </Row>
         </Form>
         {result && (
           <>

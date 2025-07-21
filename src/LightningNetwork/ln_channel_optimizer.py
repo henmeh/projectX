@@ -74,23 +74,27 @@ class LNChannelOptimizer(FeePatternAnalyzer):
         Raises:
             RuntimeError: If model not ready or no low-fee windows found.
         """
-        low_fee_id = next((id for id, cat in self.cluster_id_to_category.items() if cat == 'Low Fee'), None)
-        if low_fee_id is None:
-            raise RuntimeError("No 'Low Fee' category found.")
-
-        now_utc = datetime.now(timezone.utc)
         low_windows_open = self.get_low_fee_recommendations(num_hours_ahead=24)  # Next day for open
         low_windows_close = self.get_low_fee_recommendations(num_hours_ahead=24 * duration_days + 24)  # Future for close
 
-        if not low_windows_open or not low_windows_close:
-            raise RuntimeError("No low-fee windows predicted.")
+        valid_open = [w for w in low_windows_open if 'N/A' not in w]
+        valid_close = [w for w in low_windows_close if 'N/A' not in w]
+
+        if not valid_open or not valid_close:
+            raise RuntimeError("No valid low-fee windows predicted (all N/A).")
+
+        # Select lowest fee window (parse and sort by fee)
+        def parse_fee(rec: str) -> float:
+            return float(rec.split('Avg Fee: ')[1].split(' ')[0]) if 'Avg Fee: ' in rec else float('inf')
+
+        optimal_open_str = min(valid_open, key=parse_fee)
+        optimal_close_str = min(valid_close, key=parse_fee)
 
         # Assume current_fee from latest DB or mempool (integrate your get_mempool_feerates)
         current_fee = self._get_current_fee_estimate()
 
-        # Select first (soonest) low window for open/close
-        optimal_open = self._parse_recommendation(low_windows_open[0])
-        optimal_close = self._parse_recommendation(low_windows_close[0])  # Or find best in period
+        optimal_open = self._parse_recommendation(optimal_open_str)
+        optimal_close = self._parse_recommendation(optimal_close_str)
 
         open_cost_now = current_fee * channel_size_vb
         open_cost_opt = optimal_open['fee'] * channel_size_vb
@@ -107,7 +111,7 @@ class LNChannelOptimizer(FeePatternAnalyzer):
             'current_fee': current_fee,
             'total_savings': total_savings
         }
-
+    
 
     def _get_current_fee_estimate(self) -> float:
         # Integrate your get_mempool_feerates; fallback to avg low fee
@@ -132,6 +136,9 @@ class LNChannelOptimizer(FeePatternAnalyzer):
         time_part = parts[0].replace(' UTC', '')
         fee_part = float(parts[1].split(' ')[0]) if len(parts) > 1 else 0.0
         return {'time': time_part, 'fee': fee_part}
+    
+
+    
         
 if __name__ == "__main__":
     # IMPORTANT: Replace with your actual PostgreSQL database configuration.
