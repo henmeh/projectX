@@ -29,7 +29,7 @@ class TradingBotBuilder:
             "port": 5432,
         }
         self.predictor = FeePredictorRandomForest('postgresql://postgres:projectX@localhost:5432/bitcoin_blockchain', 'mempool_fee_histogram', 'fee_predictions_random_forest', model_dir=rf_model_dir)
-        self.predictor.run()  # Run to load/generate predictions
+        self.predictor.load_latest_predictions()  # Run to load/generate predictions
 
 
     def connect_db(self):
