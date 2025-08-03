@@ -49,8 +49,8 @@ const FeeHotspots = () => {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState({ left: 0, top: 0 });
   const [activeCategory, setActiveCategory] = useState(null);
-  const [streak, setStreak] = useState(0);
-  const [txSize, setTxSize] = useState(0);
+  //const [streak, setStreak] = useState(0);
+  //const [txSize, setTxSize] = useState(0);
   const [claimedSlot, setClaimedSlot] = useState(null);
   const [showOptimizerHelp, setShowOptimizerHelp] = useState(false);
   const heatmapRef = useRef(null);
@@ -65,12 +65,12 @@ const FeeHotspots = () => {
     const lastVisit = localStorage.getItem('lastVisit');
     let currentStreak = parseInt(localStorage.getItem('streak') || '0', 10);
     if (lastVisit === today) {
-      setStreak(currentStreak);
+      //setStreak(currentStreak);
     } else {
       currentStreak = lastVisit ? currentStreak + 1 : 1;
       localStorage.setItem('streak', currentStreak);
       localStorage.setItem('lastVisit', today);
-      setStreak(currentStreak);
+      //setStreak(currentStreak);
     }
   }, []);
 
@@ -285,12 +285,12 @@ const FeeHotspots = () => {
   }, [dataByDayHour, displayTimezone, dayNames, fullDayNames]);
 
   // Savings calc for gamification
-  const savings = useMemo(() => {
-    if (txSize <= 0 || !stats.avgFee || !bestTime.fee) return 0;
-    const lowFeeCost = bestTime.fee * txSize;
-    const avgFeeCost = stats.avgFee * txSize;
-    return ((avgFeeCost - lowFeeCost) / avgFeeCost * 100).toFixed(1);
-  }, [txSize, stats, bestTime]);
+  //const savings = useMemo(() => {
+  //  if (txSize <= 0 || !stats.avgFee || !bestTime.fee) return 0;
+  //  const lowFeeCost = bestTime.fee * txSize;
+  //  const avgFeeCost = stats.avgFee * txSize;
+  //  return ((avgFeeCost - lowFeeCost) / avgFeeCost * 100).toFixed(1);
+  //}, [txSize, stats, bestTime]);
 
   // Share on X
   const shareOnX = useCallback(() => {

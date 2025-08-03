@@ -557,14 +557,6 @@ if __name__ == "__main__":
 
     # Initialize the analyzer.
     analyzer = FeePatternAnalyzer(db_config, data_interval='6 months', n_clusters=3)
-    #analyzer.load_model()
-    #analyzer.interpret_clusters(self, df: pd.DataFrame, kmeans_model: KMeans, feature_names: List[str]) -> Tuple[pd.DataFrame, Dict[str, Dict], Dict[int, str]]:
-
-    analyzer.run(train_model=True)
-    test = analyzer.get_low_fee_recommendations()
-    print(test)
-
-    """
     # --- Step 1: Run the analysis to train a new model ---
     # This ensures we are working with the latest fee patterns from the database.    
     print("\n----- Running Fee Pattern Analysis -----")
@@ -590,4 +582,3 @@ if __name__ == "__main__":
     else:
         print("\nAnalysis failed. Check database connection and if sufficient data exists.")
         print("Exiting, as the model could not be trained.")
-    """
