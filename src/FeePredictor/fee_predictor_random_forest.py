@@ -6,7 +6,7 @@ from scipy.stats import randint as sp_randint
 from sqlalchemy import create_engine, text, Table, MetaData, Column, DateTime, Numeric, String, insert
 from datetime import datetime, timezone, timedelta
 import numpy as np
-from typing import Dict
+from typing import Dict, Optional, Tuple
 import logging
 import pickle  # For saving/loading models
 import os  # For managing model files
@@ -38,24 +38,10 @@ class FeePredictorRandomForest:
     and predict future fees while enforcing logical ordering.
     """
     
-    def __init__(self, db_connection_string, historical_table_name, 
-                 prediction_table_name='fee_predictions_random_forest',
-                 lookback_intervals=None, forecast_horizon_hours=24,
-                 model_dir='./trained_models_random_forest/'):
-        """
-        Initializes the FeePredictor with database and prediction parameters.
-
-        Args:
-            db_connection_string (str): SQLAlchemy connection string for PostgreSQL.
-            historical_table_name (str): Name of the historical fee data table.
-            prediction_table_name (str): Name of the table to store predictions. Defaults to 'fee_predictions'.
-            lookback_intervals (dict, optional): Dictionary of lookback intervals for training.
-                                                Keys are model names (e.g., 'short_term'),
-                                                values are pandas Timedelta strings (e.g., '3H').
-                                                Defaults to predefined.
-            forecast_horizon_hours (int): Number of hours into the future to predict. Defaults to 24.
-            model_dir (str): Directory to save/load trained models. Defaults to './trained_models_random_forest/'.
-        """
+    def __init__(self, db_connection_string: str, historical_table_name: str, 
+                 prediction_table_name: str = 'fee_predictions_random_forest',
+                 lookback_intervals: Optional[Dict[str, str]] = None, forecast_horizon_hours: int = 24,
+                 model_dir: str = './trained_models_random_forest/'):
         self.db_connection_string = db_connection_string
         self.historical_table_name = historical_table_name
         self.prediction_table_name = prediction_table_name
@@ -74,49 +60,39 @@ class FeePredictorRandomForest:
             self.lookback_intervals = lookback_intervals
             
         self.engine = create_engine(self.db_connection_string)
-        self.metadata = MetaData() # For reflecting/defining tables for core SQL operations
+        self.metadata = MetaData()
 
-        # Define the prediction table structure without ORM class
-        # Ensure these match your external DDL for the 'fee_predictions' table
         self.fee_predictions_table = Table(
             self.prediction_table_name, self.metadata,
-            Column('prediction_time', DateTime, nullable=False),
+            Column('prediction_time', DateTime(timezone=True), nullable=False),
             Column('model_name', String(50), nullable=False),
             Column('fast_fee', Numeric, nullable=False),
             Column('medium_fee', Numeric, nullable=False),
             Column('low_fee', Numeric, nullable=False),
-            Column('generated_at', DateTime, nullable=False)
+            Column('generated_at', DateTime(timezone=True), nullable=False)
         )
 
-        # Ensure model directory exists
         os.makedirs(self.model_dir, exist_ok=True)
         
-        self.trained_models_by_lookback = {} # To store trained models (loaded or newly trained)
-        self.latest_predictions = {} # To store the most recent predictions
-        logging.info("FeePredictor initialized.")
+        self.trained_models_by_lookback = {}
+        self.latest_predictions = {}
+        logging.info("FeePredictorRandomForest initialized.")
 
-    def _fetch_fee_data(self):
-        """
-        Fetches fee data from the PostgreSQL database.
-        Assumes the table has 'timestamp', 'fast_fee', 'medium_fee', and 'low_fee' columns.
-        """
+    def _fetch_fee_data(self) -> Optional[pd.DataFrame]:
         try:
             query = f"SELECT timestamp, fast_fee, medium_fee, low_fee FROM {self.historical_table_name} ORDER BY timestamp"
-            df = pd.read_sql(query, self.engine)
+            df = pd.read_sql(query, self.engine, parse_dates=['timestamp'])
+            df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
             logging.info(f"Data fetched successfully from PostgreSQL table '{self.historical_table_name}'.")
             return df
         except Exception as e:
             logging.error(f"Error fetching data from PostgreSQL database: {e}")
-            logging.error("Please ensure your DB_CONNECTION_STRING, historical_table_name, and column names are correct.")
             return None
 
     @staticmethod
-    def _create_features(df):
-        """
-        Creates time-based features from a datetime index.
-        """
+    def _create_features(df: pd.DataFrame) -> pd.DataFrame:
         if not isinstance(df.index, pd.DatetimeIndex):
-            df.index = pd.to_datetime(df.index)
+            df.index = pd.to_datetime(df.index, utc=True)
             
         df['hour'] = df.index.hour
         df['dayofweek'] = df.index.dayofweek
@@ -124,14 +100,14 @@ class FeePredictorRandomForest:
         df['year'] = df.index.year
         return df
 
-    def _preprocess_data(self, df):
-        """
-        Prepares the data for model training. This function now returns the full dataset
-        with features, so subsets can be taken based on lookback intervals later.
-        """
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    def _preprocess_data(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, pd.Series]]:
+        if df is None or df.empty:
+            return pd.DataFrame(), {}
+        
+        df = df.copy()
+        df['timestamp'] = pd.to_datetime(df['timestamp'], utc=True)
         df.set_index('timestamp', inplace=True)
-        df.sort_index(inplace=True) # Ensure chronological order
+        df.sort_index(inplace=True)
 
         df = self._create_features(df)
         
@@ -139,67 +115,43 @@ class FeePredictorRandomForest:
         target_fees = ['fast_fee', 'medium_fee', 'low_fee']
         
         X_all = df[features]
-        y_all_dict = {fee: df[fee] for fee in target_fees}
+        y_all_dict = {fee: df[fee] for fee in target_fees if fee in df.columns}
         
         logging.info(f"Data preprocessed. Total observations: {len(X_all)}")
         return X_all, y_all_dict
 
-
-    def _train_models(self, X_data, y_data_dict, lookback_timedelta=None, model_key_name=None): # ADDED model_key_name
-        """
-        Trains a separate Random Forest Regressor model for each fee category,
-        optionally filtering data by a lookback timedelta.
-        """
+    def _train_models(self, X_data: pd.DataFrame, y_data_dict: Dict[str, pd.Series], lookback_timedelta: Optional[timedelta] = None, model_key_name: Optional[str] = None) -> Dict[str, RandomForestRegressor]:
+        if X_data.empty:
+            return {}
+        
         if lookback_timedelta:
             end_time = X_data.index.max()
             start_time = end_time - lookback_timedelta
-            
             X_train_filtered = X_data[X_data.index >= start_time]
-            y_train_dict_filtered = {fee: y_data_dict[fee][y_data_dict[fee].index >= start_time] 
-                                     for fee in y_data_dict.keys()}
-            
-            logging.info(f"  Training with lookback: {str(lookback_timedelta)} (Data points: {len(X_train_filtered)})")
+            y_train_dict_filtered = {fee: y_data_dict[fee][y_data_dict[fee].index >= start_time] for fee in y_data_dict}
+            logging.info(f"  Training with lookback: {lookback_timedelta} (Data points: {len(X_train_filtered)})")
         else:
             X_train_filtered = X_data
             y_train_dict_filtered = y_data_dict
             logging.info(f"  Training with ALL available data (Data points: {len(X_train_filtered)})")
 
-        if X_train_filtered.empty:
-            logging.warning("  No data available for the specified lookback window. Skipping model training.")
-            return {}
-
         trained_models = {}
-        
-        # Define default parameters in case a model_key_name or fee_type is not found in `parameters`
-        default_params = {
-            'n_estimators': 100, 'max_features': 'sqrt', 'max_depth': None, 
-            'min_samples_split': 2, 'min_samples_leaf': 1, 'bootstrap': True
-        }
-
-        for fee_type, y_train in y_train_dict_filtered.items():
-            if not y_train.empty:
-                logging.info(f"    Training model for {fee_type}...")
-                
-                current_model_params = default_params # Start with defaults
-
-                # Use model_key_name to retrieve specific tuned parameters
-                if model_key_name and model_key_name in parameters and fee_type in parameters[model_key_name]:
-                    current_model_params = parameters[model_key_name][fee_type]
-                    logging.info(f"    Using tuned parameters for {model_key_name} {fee_type}: {current_model_params}")
-                else:
-                    logging.warning(f"    No specific tuned parameters found for '{model_key_name}' and '{fee_type}'. Using default parameters.")
-                
-                model = RandomForestRegressor(**current_model_params, random_state=42, n_jobs=-1)
-                model.fit(X_train_filtered, y_train)
-                trained_models[fee_type] = model
-                logging.info(f"    Model for {fee_type} trained.")
-            else:
+        for fee_type in y_data_dict:
+            y_train = y_train_dict_filtered.get(fee_type)
+            if y_train is None or y_train.empty:
                 logging.warning(f"    No target data for {fee_type} in this lookback. Skipping training.")
-        return trained_models
-    
+                continue
+            
+            logging.info(f"    Training model for {fee_type}...")
+            params = parameters.get(model_key_name, {}).get(fee_type, {'n_estimators': 100, 'max_features': 'sqrt', 'max_depth': None, 'min_samples_split': 2, 'min_samples_leaf': 1, 'bootstrap': True})
+            model = RandomForestRegressor(**params, random_state=42, n_jobs=-1)
+            model.fit(X_train_filtered, y_train)
+            trained_models[fee_type] = model
+            logging.info(f"    Model for {fee_type} trained.")
 
-    def _save_models(self, models, model_name_prefix):
-        """Saves trained models to disk."""
+        return trained_models
+
+    def _save_models(self, models: Dict[str, RandomForestRegressor], model_name_prefix: str) -> None:
         for fee_type, model in models.items():
             filename = os.path.join(self.model_dir, f"{model_name_prefix}_{fee_type}.pkl")
             try:
@@ -209,10 +161,9 @@ class FeePredictorRandomForest:
             except Exception as e:
                 logging.error(f"  Failed to save model {filename}: {e}")
 
-    def _load_models(self, model_name_prefix):
-        """Loads trained models from disk."""
+    def _load_models(self, model_name_prefix: str) -> Optional[Dict[str, RandomForestRegressor]]:
         loaded_models = {}
-        for fee_type in ['fast_fee', 'medium_fee', 'low_fee']: # Assuming these fee types
+        for fee_type in ['fast_fee', 'medium_fee', 'low_fee']:
             filename = os.path.join(self.model_dir, f"{model_name_prefix}_{fee_type}.pkl")
             if os.path.exists(filename):
                 try:
@@ -221,209 +172,137 @@ class FeePredictorRandomForest:
                     logging.info(f"  Loaded model for {fee_type} from {filename}")
                 except Exception as e:
                     logging.warning(f"  Could not load model {filename}: {e}. Will retrain.")
-                    loaded_models = {} # Clear partial loads if one fails
-                    break
+                    return None
             else:
                 logging.info(f"  No saved model found for {fee_type} at {filename}. Will train new.")
-                loaded_models = {} # Indicate no models found for this prefix
-                break
-        return loaded_models if loaded_models else None
+                return None
+        return loaded_models
 
-
-    def _predict_future_fees(self, trained_models, current_time):
+    def _predict_future_fees(self, trained_models: Dict[str, RandomForestRegressor], current_time: datetime) -> pd.DataFrame:
         """
         Predicts future fees for a given time horizon and enforces logical ordering:
         low_fee <= medium_fee <= fast_fee.
-        
-        Args:
-            trained_models (dict): A dictionary of trained models (one for each fee type).
-            current_time (datetime): The timestamp from which to start the prediction horizon.
-        
-        Returns:
-            pd.DataFrame: A DataFrame with the predicted fees, indexed by future timestamps,
-                          with enforced logical ordering.
         """
-        # Ensure we predict from the next full hour
-        start_prediction_time = current_time.replace(minute=0, second=0, microsecond=0) + dt.timedelta(hours=1)
-        
-        future_timestamps = pd.date_range(start=start_prediction_time, 
-                                          periods=self.forecast_horizon_hours, 
-                                          freq='h') 
+        start_prediction_time = current_time.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        future_timestamps = pd.date_range(start=start_prediction_time, periods=self.forecast_horizon_hours, freq='H')
         future_df = pd.DataFrame(index=future_timestamps)
-        
         future_features_df = self._create_features(future_df)
         
         raw_predictions_df = pd.DataFrame(index=future_timestamps)
         
-        for fee_type, model in trained_models.items():
-            if model: # Ensure model was trained successfully for this fee type
+        for fee_type in ['fast_fee', 'medium_fee', 'low_fee']:
+            model = trained_models.get(fee_type)
+            if model:
                 raw_predictions_df[fee_type] = model.predict(future_features_df)
             else:
-                raw_predictions_df[fee_type] = np.nan # If no model was trained, fill with NaN
-                
-        # --- Enforce logical ordering: low_fee <= medium_fee <= fast_fee ---
+                raw_predictions_df[fee_type] = np.nan
+        
         corrected_predictions_df = raw_predictions_df.copy()
-
-        for index, row in raw_predictions_df.iterrows():
-            if row.isnull().any(): # Skip if any value is NaN (e.g., model not trained)
-                corrected_predictions_df.loc[index] = np.nan # Ensure corrected row is also NaN
-                continue 
-                
-            low = row['low_fee']
-            medium = row['medium_fee']
-            fast = row['fast_fee']
-
-            # Apply corrections in sequence
-            low = min(low, medium, fast) # Low should be the minimum of the three
-            fast = max(low, medium, fast) # Fast should be the maximum of the three
-            # Medium should be between low and fast (if it's out of bounds, set to nearest boundary)
-            medium = max(low, min(medium, fast))
-
-            # Ensure non-negativity
-            corrected_predictions_df.loc[index, 'low_fee'] = max(0, low)
-            corrected_predictions_df.loc[index, 'medium_fee'] = max(0, medium)
-            corrected_predictions_df.loc[index, 'fast_fee'] = max(0, fast)
-            
+        for _, row in raw_predictions_df.iterrows():
+            if row.isnull().any():
+                continue
+            low, medium, fast = sorted([row['low_fee'], row['medium_fee'], row['fast_fee']])
+            corrected_predictions_df.at[row.name, 'low_fee'] = max(0, low)
+            corrected_predictions_df.at[row.name, 'medium_fee'] = max(0, medium)
+            corrected_predictions_df.at[row.name, 'fast_fee'] = max(0, fast)
+        
         return corrected_predictions_df
 
-    def _store_predictions_to_db(self, predictions_df, model_name):
-        """
-        Stores the generated predictions into the database table 'fee_predictions'.
+    def _store_predictions_to_db(self, predictions_df: pd.DataFrame, model_name: str) -> None:
+        records = [
+            {
+                'prediction_time': index.tz_convert('UTC'),
+                'model_name': model_name,
+                'fast_fee': float(row['fast_fee']),
+                'medium_fee': float(row['medium_fee']),
+                'low_fee': float(row['low_fee']),
+                'generated_at': self.generated_at
+            }
+            for index, row in predictions_df.iterrows() if not row.isnull().any()
+        ]
         
-        Args:
-            predictions_df (pd.DataFrame): DataFrame containing predictions with
-                                           'fast_fee', 'medium_fee', 'low_fee' columns
-                                           and a datetime index.
-            model_name (str): The name of the model that generated these predictions (e.g., 'very_short').
-        """
-        records_to_insert = []
-
-        for index, row in predictions_df.iterrows():
-            if not row.isnull().any(): # Only store valid predictions
-                records_to_insert.append({
-                    'prediction_time': index,
-                    'model_name': model_name,
-                    'fast_fee': float(row['fast_fee']),    # Convert to standard Python float
-                    'medium_fee': float(row['medium_fee']),# Convert to standard Python float
-                    'low_fee': float(row['low_fee']),      # Convert to standard Python float
-                    'generated_at': self.generated_at
-                })
-        
-        if records_to_insert:
-            conn = None
+        if records:
             try:
-                conn = self.engine.connect()
-                # Use SQLAlchemy core's insert() to insert multiple rows
-                conn.execute(insert(self.fee_predictions_table), records_to_insert)
-                conn.commit() # Commit the transaction
-                logging.info(f"Successfully stored {len(records_to_insert)} predictions for model '{model_name}' to '{self.prediction_table_name}'.")
+                with self.engine.begin() as conn:  # Auto-commit/rollback
+                    conn.execute(insert(self.fee_predictions_table), records)
+                logging.info(f"Successfully stored {len(records)} predictions for model '{model_name}' to '{self.prediction_table_name}'.")
             except Exception as e:
                 logging.error(f"Error storing predictions for model '{model_name}': {e}")
-                if conn:
-                    conn.rollback() # Rollback on error
-            finally:
-                if conn:
-                    conn.close()
         else:
             logging.warning(f"No valid predictions to store for model '{model_name}'.")
 
-
-    def tune_random_forest_hyperparameters(self, n_iter_search=20,  # Number of parameter settings that are sampled (trade-off: time vs. comprehensiveness)
-        cv_folds=5 # Number of cross-validation folds
-    ):
-        """
-        Performs hyperparameter tuning for RandomForestRegressor models for different fee types
-        and lookback intervals using RandomizedSearchCV.
-
-        Args:
-            n_iter_search (int): Number of parameter settings that are sampled in RandomizedSearchCV.
-                                Higher value means more exhaustive search but longer runtime.
-            cv_folds (int): Number of cross-validation folds to use for robust evaluation.
-
-        Returns:
-            dict: A dictionary containing the best parameters found for each model and fee type.
-                Example: {'very_short': {'fast_fee': {'n_estimators': 150, ...}, 'medium_fee': {...}}, ...}
-        """
+    def tune_random_forest_hyperparameters(self, n_iter_search: int = 20, cv_folds: int = 5) -> Dict[str, Dict[str, Dict[str, Any]]]:
         logging.info(f"Starting hyperparameter tuning process at {datetime.now(timezone.utc)}...")
-
-        # Fetch and preprocess all historical data
+        
         df_all = self._fetch_fee_data()
         if df_all is None or df_all.empty:
             logging.error("No data fetched or data is empty. Cannot proceed with tuning.")
             return {}
-
+        
         X_all, y_all_dict = self._preprocess_data(df_all)
-
+        
         if X_all.empty:
             logging.error("Preprocessed data is empty. Cannot proceed with tuning.")
             return {}
-
-        # Define the parameter distribution for RandomizedSearchCV
-        # These ranges are common starting points; adjust based on your data/needs.
+        
         param_dist = {
-            'n_estimators': sp_randint(50, 300), # Number of trees in the forest
-            'max_features': ['sqrt', 'log2', 0.6, 0.8, 1.0], # Number of features to consider when looking for the best split
-            'max_depth': sp_randint(5, 50), # Maximum number of levels in tree
-            'min_samples_split': sp_randint(2, 20), # Minimum number of samples required to split an internal node
-            'min_samples_leaf': sp_randint(1, 10), # Minimum number of samples required to be at a leaf node
-            'bootstrap': [True, False] # Whether bootstrap samples are used when building trees
+            'n_estimators': sp_randint(50, 300),
+            'max_features': ['sqrt', 'log2', 0.6, 0.8, 1.0],
+            'max_depth': sp_randint(5, 50),
+            'min_samples_split': sp_randint(2, 20),
+            'min_samples_leaf': sp_randint(1, 10),
+            'bootstrap': [True, False]
         }
-
+        
         best_params_found = {}
-
-        # Loop through each defined lookback interval
+        
         for name, interval_str in self.lookback_intervals.items():
             logging.info(f"\n--- Tuning {name.replace('_', ' ').title()} Model ({interval_str} Lookback) ---")
             lookback_timedelta = timedelta(hours=int(interval_str[:-1])) if interval_str[-1] == 'H' else timedelta(days=int(interval_str[:-1])) if interval_str[-1] == 'D' else timedelta(weeks=int(interval_str[:-1])) if interval_str[-1] == 'W' else timedelta(weeks=int(interval_str[:-1])*4) if interval_str[-1] == 'M' else None
             if lookback_timedelta is None:
-                logging.error(f"Invalid interval_str: {interval_str}")
+                logging.warning(f"Invalid interval_str: {interval_str}. Skipping.")
                 continue
-
-            # Filter data based on the current lookback interval
+            
             end_time = X_all.index.max()
             start_time = end_time - lookback_timedelta
             
             X_train_filtered = X_all[X_all.index >= start_time]
-            y_train_dict_filtered = {fee: y_all_dict[fee][y_all_dict[fee].index >= start_time] 
-                                     for fee in y_all_dict.keys()}
+            y_train_dict_filtered = {fee: y_all_dict[fee][y_all_dict[fee].index >= start_time] for fee in y_all_dict}
             
             if X_train_filtered.empty:
                 logging.warning(f"  No data available for lookback {interval_str}. Skipping tuning for {name}.")
                 continue
-
+            
             best_params_found[name] = {}
-
-            # Tune for each fee type (fast_fee, medium_fee, low_fee)
+            
             for fee_type, y_train in y_train_dict_filtered.items():
-                if not y_train.empty:
-                    logging.info(f"  Tuning for {fee_type}...")
-                    
-                    # Initialize a base model
-                    rf_model = RandomForestRegressor(random_state=42, n_jobs=-1) 
-
-                    # Setup RandomizedSearchCV
-                    random_search = RandomizedSearchCV(
-                        estimator=rf_model, 
-                        param_distributions=param_dist, 
-                        n_iter=n_iter_search, 
-                        cv=cv_folds, 
-                        verbose=2, 
-                        random_state=42,
-                        n_jobs=-1,
-                        scoring='neg_mean_squared_error' 
-                    )
-
-                    # Fit the random search to the data
-                    random_search.fit(X_train_filtered, y_train)
-
-                    logging.info(f"  Best parameters for {fee_type}: {random_search.best_params_}")
-                    logging.info(f"  Best (Negative) MSE for {fee_type}: {random_search.best_score_:.4f}")
-                    logging.info(f"  Corresponding (Positive) MSE: {-random_search.best_score_:.4f}")
-
-                    best_params_found[name][fee_type] = random_search.best_params_
-                else:
+                if y_train.empty:
                     logging.warning(f"  No target data for {fee_type} in this lookback. Skipping tuning.")
-
+                    continue
+                
+                logging.info(f"  Tuning for {fee_type}...")
+                
+                rf_model = RandomForestRegressor(random_state=42, n_jobs=-1)
+                
+                random_search = RandomizedSearchCV(
+                    estimator=rf_model, 
+                    param_distributions=param_dist, 
+                    n_iter=n_iter_search, 
+                    cv=cv_folds, 
+                    verbose=2, 
+                    random_state=42,
+                    n_jobs=-1,
+                    scoring='neg_mean_squared_error'
+                )
+                
+                random_search.fit(X_train_filtered, y_train)
+                
+                logging.info(f"  Best parameters for {fee_type}: {random_search.best_params_}")
+                logging.info(f"  Best (Negative) MSE for {fee_type}: {random_search.best_score_:.4f}")
+                logging.info(f"  Corresponding (Positive) MSE: {-random_search.best_score_:.4f}")
+                
+                best_params_found[name][fee_type] = random_search.best_params_
+        
         logging.info("\nHyperparameter tuning completed.")
         return best_params_found
 
@@ -435,13 +314,13 @@ class FeePredictorRandomForest:
         logging.info(f"Starting FeePredictorRandomForest run at {datetime.now(timezone.utc)}...")
         
         current_time_for_prediction = datetime.now(timezone.utc)
-
+        
         df_all = self._fetch_fee_data()
         if df_all is None or df_all.empty:
             logging.error("No data fetched or data is empty. Cannot proceed with prediction.")
             self.latest_predictions = {}
             return self.latest_predictions
-
+        
         X_all, y_all_dict = self._preprocess_data(df_all)
         
         train_size = int(len(X_all) * 0.8)
@@ -450,15 +329,15 @@ class FeePredictorRandomForest:
         
         X_test_full = X_all[train_size:]
         y_test_full_dict = {key: val[train_size:] for key, val in y_all_dict.items()}
-
+        
         logging.info(f"Total historical data observations: {len(X_all)}")
         logging.info(f"Full training data observations (for lookback slicing): {len(X_train_full)}")
         logging.info(f"Test data observations (for evaluation): {len(X_test_full)}")
-
-        self.latest_predictions = {} 
-        self.trained_models_by_lookback = {} 
-
-        for name, interval_str in self.lookback_intervals.items(): # 'name' is 'very_short', 'hourly', etc.
+        
+        self.latest_predictions = {}
+        self.trained_models_by_lookback = {}
+        
+        for name, interval_str in self.lookback_intervals.items():
             logging.info(f"\n--- Processing {name.replace('_', ' ').title()} Model ({interval_str} Lookback) ---")
             lookback_timedelta = timedelta(hours=int(interval_str[:-1])) if interval_str[-1] == 'H' else timedelta(days=int(interval_str[:-1])) if interval_str[-1] == 'D' else timedelta(weeks=int(interval_str[:-1])) if interval_str[-1] == 'W' else timedelta(weeks=int(interval_str[:-1])*4) if interval_str[-1] == 'M' else None
             if lookback_timedelta is None:
@@ -467,7 +346,7 @@ class FeePredictorRandomForest:
             
             model_name_prefix = f"model_{name}"
             trained_models_for_interval = None
-
+            
             last_training_time_path = os.path.join(self.model_dir, f"{model_name_prefix}_last_trained.txt")
             retrain_needed = True
             if os.path.exists(last_training_time_path):
@@ -486,15 +365,12 @@ class FeePredictorRandomForest:
                                 logging.warning(f"  Failed to load models for {name}. Retraining.")
                         else:
                             logging.info(f"  Models for {name} trained {time_since_last_train:.1f} hours ago, more than {retrain_interval_hours} hours. Retraining.")
-
                 except Exception as e:
                     logging.warning(f"  Could not read last trained time for {name}: {e}. Retraining.")
             else:
                 logging.info(f"  No previous training record found for {name}. Retraining.")
-
+            
             if retrain_needed:
-                # Step 3: Train models for the current lookback
-                # PASSED 'name' as model_key_name HERE:
                 trained_models_for_interval = self._train_models(X_train_full, y_train_full_dict, lookback_timedelta, model_key_name=name)
                 if trained_models_for_interval:
                     self._save_models(trained_models_for_interval, model_name_prefix)
@@ -503,12 +379,8 @@ class FeePredictorRandomForest:
                 else:
                     logging.warning(f"  No models trained for {name} lookback after retraining attempt. Skipping prediction.")
                     continue
-
-            if not trained_models_for_interval:
-                logging.warning(f"  No trained models available for {name}. Skipping prediction and storage.")
-                continue
-
-            self.trained_models_by_lookback[name] = trained_models_for_interval 
+            
+            self.trained_models_by_lookback[name] = trained_models_for_interval
             
             logging.info(f"Evaluating {name.replace('_', ' ').title()} model performance on the test set:")
             for fee_type, model in trained_models_for_interval.items():
@@ -527,7 +399,6 @@ class FeePredictorRandomForest:
         logging.info("FeePredictorRandomForest run completed. Predictions stored in DB and memory.")
         return self.latest_predictions
     
-
     def load_latest_predictions(self, freshness_hours: int = 1) -> bool:
         """Loads latest predictions from DB if fresh, else runs full pipeline."""
         query = f"""

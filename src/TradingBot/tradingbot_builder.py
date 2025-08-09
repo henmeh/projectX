@@ -91,9 +91,11 @@ class TradingBotBuilder:
         # Load historical fee data
         historical_df = self._load_historical_for_backtest(start_date, end_date)
 
-        # Mock hodl_waves (e.g., 70-90%) and btc_price (~$200K)
-        historical_df['hodl_waves'] = np.random.uniform(70, 90, len(historical_df))
-        historical_df['btc_price'] = np.random.uniform(180000, 220000, len(historical_df))
+        historical_df = pd.read_csv("mockdata.csv", parse_dates=['timestamp'])
+        print(historical_df.head())
+
+        if historical_df.empty:
+            raise ValueError(f"No historical data found for the period {start_date} to {end_date}. Please check your database or adjust the date range.")
 
         trades = []
         pnl = 0
@@ -195,8 +197,8 @@ if __name__ == "__main__":
     print(f"Created rule ID: {rule_id}")
 
     # Test 2: Backtest the Bot
-    start_date = "2024-08-01"
-    end_date = "2024-08-31"
+    start_date = "2025-07-01"
+    end_date = "2025-07-31"
     backtest_result = bot_builder.backtest_bot(rule_id, start_date, end_date)
     print(f"Backtest Result: PNL={backtest_result['pnl']:.2f}, Trades={len(backtest_result['trades'])}, Sharpe={backtest_result['performance_metrics']['sharpe']:.2f}")
 
