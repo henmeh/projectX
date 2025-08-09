@@ -3,10 +3,10 @@ from sklearn.metrics import mean_squared_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import randint as sp_randint
-from sqlalchemy import create_engine, text, Table, MetaData, Column, DateTime, Numeric, String, insert
+from sqlalchemy import create_engine, Table, MetaData, Column, DateTime, Numeric, String, insert
 from datetime import datetime, timezone, timedelta
 import numpy as np
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 import logging
 import pickle  # For saving/loading models
 import os  # For managing model files
