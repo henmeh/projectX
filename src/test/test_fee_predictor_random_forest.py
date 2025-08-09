@@ -4,6 +4,8 @@ from sklearn.ensemble import RandomForestRegressor
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone
+import os
+import pickle
 import tempfile
 import sys
 sys.path.append('/media/henning/Volume/Programming/projectX/src/')
@@ -39,14 +41,14 @@ class TestFeePredictorRandomForest(unittest.TestCase):
         mock_read_sql.return_value = mock_df
         df = self.predictor._fetch_fee_data()
         self.assertFalse(df.empty)
-        self.assertEqual(df['timestamp'].dt.tz.zone, 'UTC')
+        self.assertEqual(df['timestamp'].dt.tz, timezone.utc)
 
     def test_preprocess_data(self):
         mock_df = self.mock_data()
         X, y_dict = self.predictor._preprocess_data(mock_df)
         self.assertIn('hour', X.columns)
         self.assertEqual(len(y_dict), 3)
-        self.assertEqual(X.index.tz.zone, 'UTC')
+        self.assertEqual(X.index.tz, timezone.utc)
 
     def test_train_models(self):
         mock_df = self.mock_data()
@@ -65,7 +67,7 @@ class TestFeePredictorRandomForest(unittest.TestCase):
         self.assertEqual(len(predictions), self.predictor.forecast_horizon_hours)
         self.assertTrue((predictions['low_fee'] <= predictions['medium_fee']).all())
         self.assertTrue((predictions['medium_fee'] <= predictions['fast_fee']).all())
-        self.assertEqual(predictions.index.tz.zone, 'UTC')
+        self.assertEqual(predictions.index.tz, timezone.utc)
 
     @patch('pandas.read_sql')
     def test_load_latest_predictions(self, mock_read_sql):
@@ -81,7 +83,7 @@ class TestFeePredictorRandomForest(unittest.TestCase):
         loaded = self.predictor.load_latest_predictions(freshness_hours=1)
         self.assertTrue(loaded)
         self.assertIn('very_short', self.predictor.latest_predictions)
-        self.assertEqual(self.predictor.latest_predictions['very_short'].index.tz.zone, None)  # Since read_sql may strip tz; adjust if needed
+        self.assertEqual(self.predictor.latest_predictions['very_short'].index.tz, timezone.utc)
 
     @patch('pandas.read_sql')
     def test_tune_hyperparameters(self, mock_read_sql):
